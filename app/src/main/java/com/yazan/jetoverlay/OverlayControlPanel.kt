@@ -353,6 +353,15 @@ fun OverlayControlPanel(modifier: Modifier = Modifier) {
                         ) {
                             Text("Connect Notion")
                         }
+                        Spacer(modifier = Modifier.height(8.dp))
+                        androidx.compose.material3.Button(
+                            onClick = {
+                                com.yazan.jetoverlay.service.integration.GitHubIntegration.startOAuth(context)
+                            },
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Text("Connect GitHub")
+                        }
                     }
                 }
                 

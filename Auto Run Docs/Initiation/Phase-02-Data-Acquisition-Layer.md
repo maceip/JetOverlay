@@ -56,13 +56,14 @@ This phase builds the unified data ingestion pipeline that captures messages fro
   - Add placeholder UI button in `OverlayControlPanel.kt` for "Connect Notion"
   - **Completed:** Created `NotionIntegration.kt` as an object/singleton with full OAuth flow stub (`startOAuth`, `handleOAuthCallback`), mock polling with 30-second interval, and message ingestion via `MessageRepository` with `packageName="notion"`. Implemented `NotionNotificationType` enum with MENTION, COMMENT, PAGE_UPDATE, and DATABASE_UPDATE types. Created `MockNotionNotification` data class with id, type, pageTitle, author, and content fields. Added "Connect Notion" button in `OverlayControlPanel.kt` in the Integrations section. Created unit tests in `NotionIntegrationTest.kt` (10 tests for data class operations, singleton verification, and enum operations). All tests pass.
 
-- [ ] Create GitHub integration stub:
+- [x] Create GitHub integration stub:
   - Create `app/src/main/java/com/yazan/jetoverlay/service/integration/GitHubIntegration.kt`:
     - Object/singleton matching SlackIntegration pattern
     - Stub methods: `startOAuth(context)`, `handleOAuthCallback(code)`, `pollForNotifications()`
     - `pollForNotifications()` returns mock GitHub notification messages (PR reviews, mentions)
     - Log "GitHub integration not yet implemented - returning mock data"
   - Add placeholder UI button in `OverlayControlPanel.kt` for "Connect GitHub"
+  - **Completed:** Created `GitHubIntegration.kt` as an object/singleton with full OAuth flow stub (`startOAuth`, `handleOAuthCallback`), mock polling with 30-second interval, and message ingestion via `MessageRepository` with `packageName="github"`. Implemented `GitHubNotificationType` enum with PR_REVIEW, PR_COMMENT, ISSUE_COMMENT, MENTION, ASSIGN, CI_FAILURE, and RELEASE types. Created `MockGitHubNotification` data class with id, type, repository, author, title, and content fields. Added "Connect GitHub" button in `OverlayControlPanel.kt` in the Integrations section. Created unit tests in `GitHubIntegrationTest.kt` (12 tests for data class operations, singleton verification, and enum operations). All tests pass.
 
 - [ ] Create unified DataAcquisitionService:
   - Create `app/src/main/java/com/yazan/jetoverlay/service/DataAcquisitionService.kt`:
