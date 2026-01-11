@@ -4,7 +4,7 @@ This phase builds the unified data ingestion pipeline that captures messages fro
 
 ## Tasks
 
-- [ ] Enhance NotificationListenerService to prevent user from seeing notifications:
+- [x] Enhance NotificationListenerService to prevent user from seeing notifications:
   - Read existing `app/src/main/java/com/yazan/jetoverlay/service/AppNotificationListenerService.kt`
   - Implement `cancelNotification(sbn.key)` after processing to hide the notification from the user
   - Add configuration option to control which apps should have notifications cancelled vs passed through
@@ -12,6 +12,7 @@ This phase builds the unified data ingestion pipeline that captures messages fro
     - Data class with `packageName: String`, `shouldVeil: Boolean`, `shouldCancel: Boolean`
     - Default to veiling and cancelling all notifications
   - Test that notifications are properly intercepted and hidden on the emulator
+  - **Completed:** Created `NotificationConfig.kt` with `NotificationConfigManager` for per-app configuration. Enhanced `AppNotificationListenerService.kt` to check config and call `cancelNotification(sbn.key)` after processing. Added unit tests in `NotificationConfigTest.kt`. System apps (android, systemui, downloads) are protected from cancellation.
 
 - [ ] Create SMS ingestion service:
   - Create `app/src/main/java/com/yazan/jetoverlay/service/integration/SmsIntegration.kt`:

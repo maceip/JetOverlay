@@ -4,6 +4,7 @@ import com.yazan.jetoverlay.data.AppDatabase
 import android.service.notification.NotificationListenerService
 import android.service.notification.StatusBarNotification
 import com.yazan.jetoverlay.data.MessageRepository
+import com.yazan.jetoverlay.data.NotificationConfigManager
 import com.yazan.jetoverlay.data.ReplyActionCache
 import com.yazan.jetoverlay.domain.MessageProcessor
 import com.yazan.jetoverlay.service.notification.MessageNotificationFilter
@@ -35,11 +36,20 @@ class AppNotificationListenerService : NotificationListenerService() {
         super.onNotificationPosted(sbn)
         if (sbn == null) return
         val notification: StatusBarNotification = sbn
+        val packageName = sbn.packageName
 
-        android.util.Log.d("JetOverlayDebug", "DEBUG: Notification posted: pkg=${sbn.packageName}, id=${sbn.id}, ongoing=${sbn.isOngoing}")
+        android.util.Log.d("JetOverlayDebug", "DEBUG: Notification posted: pkg=$packageName, id=${sbn.id}, ongoing=${sbn.isOngoing}")
+
+        // Check configuration for this app
+        val config = NotificationConfigManager.getConfig(packageName)
+
+        if (!config.shouldVeil) {
+            android.util.Log.d("JetOverlayDebug", "DEBUG: Veiling disabled for $packageName, passing through")
+            return
+        }
 
         if (filter.shouldProcess(notification)) {
-            android.util.Log.d("JetOverlayDebug", "DEBUG: Filter PASSED for ${sbn.packageName}")
+            android.util.Log.d("JetOverlayDebug", "DEBUG: Filter PASSED for $packageName")
             mapper.map(notification)?.let { message ->
                 scope.launch {
                     val id = repository.ingestNotification(
@@ -57,7 +67,19 @@ class AppNotificationListenerService : NotificationListenerService() {
                     } else {
                         android.util.Log.d("JetOverlayDebug", "DEBUG: No reply action found.")
                     }
-                    
+
+                    // Cancel (hide) the notification if configured to do so
+                    if (config.shouldCancel) {
+                        launch(Dispatchers.Main) {
+                            try {
+                                cancelNotification(sbn.key)
+                                android.util.Log.d("JetOverlayDebug", "DEBUG: Notification cancelled for $packageName")
+                            } catch (e: Exception) {
+                                android.util.Log.e("JetOverlayDebug", "DEBUG: Failed to cancel notification: ${e.message}")
+                            }
+                        }
+                    }
+
                     // AUTO-TRIGGER: Wake up the overlay
                     launch(Dispatchers.Main) {
                         if (!com.yazan.jetoverlay.api.OverlaySdk.isOverlayActive("agent_bubble")) {
@@ -66,7 +88,7 @@ class AppNotificationListenerService : NotificationListenerService() {
                                 context = applicationContext,
                                 config = com.yazan.jetoverlay.api.OverlayConfig(
                                     id = "agent_bubble",
-                                    type = "overlay_1", 
+                                    type = "overlay_1",
                                     initialX = 100,
                                     initialY = 300
                                 )
@@ -78,7 +100,7 @@ class AppNotificationListenerService : NotificationListenerService() {
                 }
             }
         } else {
-            android.util.Log.d("JetOverlayDebug", "DEBUG: Filter REJECTED for ${sbn.packageName}")
+            android.util.Log.d("JetOverlayDebug", "DEBUG: Filter REJECTED for $packageName")
         }
     }
     
