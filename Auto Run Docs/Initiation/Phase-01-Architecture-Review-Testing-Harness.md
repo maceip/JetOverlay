@@ -51,13 +51,14 @@ This phase establishes the foundation for confident development by auditing the 
     - type: analysis, tags: [architecture, message-processing, coroutines]
   - **Completed 2026-01-11**: Created comprehensive audit identifying 11 issues: no coroutine cancellation in MessageProcessor (HIGH), duplicate processing risk due to Flow re-emission (HIGH), silent exception handling with SupervisorJob (MEDIUM), service scope not cancelled (MEDIUM), missing EXTRA_BIG_TEXT handling in NotificationMapper (MEDIUM). SupervisorJob usage is correct but incomplete - needs CoroutineExceptionHandler. NotificationFilter is intentionally permissive for debugging. Recommended adding stop() method to MessageProcessor and cancelling scopes in onDestroy().
 
-- [ ] Create architecture summary with fragility matrix:
+- [x] Create architecture summary with fragility matrix:
   - Create `docs/architecture/fragility-matrix.md` consolidating all audit findings
   - Include front matter: type: report, tags: [architecture, summary, fragility]
   - Create a risk matrix table with columns: Component, Risk Level (Low/Medium/High), Issue, Recommendation
   - Link to individual audit documents using `[[document-name]]` wiki-links
   - Prioritize issues that could cause crashes or ANRs
   - Include a "Quick Wins" section for easy fixes
+  - **Completed 2026-01-11**: Created comprehensive fragility matrix consolidating 37 issues from all 4 audit documents. Categorized by severity (4 HIGH, 13 MEDIUM, 20 LOW), component risk levels, and issue types. Included 8 Quick Wins that can be implemented in under an hour combined. Most critical findings: coroutine lifecycle management (MessageProcessor/services), duplicate processing risk, and testability barriers from singleton pattern.
 
 - [ ] Set up Android emulator for E2E testing:
   - Check if Android SDK and emulator are available on the system via command line tools
