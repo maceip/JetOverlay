@@ -329,6 +329,21 @@ fun OverlayControlPanel(modifier: Modifier = Modifier) {
                         ) {
                             Text("Connect Slack")
                         }
+                        Spacer(modifier = Modifier.height(8.dp))
+                        androidx.compose.material3.Button(
+                            onClick = {
+                                com.yazan.jetoverlay.service.integration.EmailIntegration.startOAuth(context)
+                            },
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Email,
+                                contentDescription = null,
+                                modifier = Modifier.size(18.dp)
+                            )
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text("Connect Email")
+                        }
                     }
                 }
                 

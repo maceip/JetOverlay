@@ -25,7 +25,7 @@ This phase builds the unified data ingestion pipeline that captures messages fro
   - Handle the permission request flow in `OverlayControlPanel.kt`
   - **Completed:** Created `SmsIntegration.kt` as a BroadcastReceiver that handles `SMS_RECEIVED_ACTION` intents, extracts sender and message body using `Telephony.Sms.Intents.getMessagesFromIntent()`, supports multi-part SMS concatenation, and ingests messages via `MessageRepository` with `packageName="sms"`. Added SMS permissions (`RECEIVE_SMS`, `READ_SMS`) and receiver registration in `AndroidManifest.xml`. Added SMS permission request flow in `OverlayControlPanel.kt` after Call Screening role check. Created unit tests in `SmsIntegrationTest.kt` and instrumented tests in `service/SmsIntegrationTest.kt`.
 
-- [ ] Create email ingestion foundation (Gmail API stub):
+- [x] Create email ingestion foundation (Gmail API stub):
   - Create `app/src/main/java/com/yazan/jetoverlay/service/integration/EmailIntegration.kt`:
     - Object/singleton matching the SlackIntegration pattern
     - Stub methods: `startOAuth(context)`, `handleOAuthCallback(code)`, `pollForEmails()`
@@ -35,6 +35,7 @@ This phase builds the unified data ingestion pipeline that captures messages fro
     - Store OAuth tokens (access_token, refresh_token, expiry)
     - Persist to SharedPreferences (no encryption needed per requirements)
   - Add placeholder UI button in `OverlayControlPanel.kt` for "Connect Email"
+  - **Completed:** Created `EmailIntegration.kt` as an object/singleton with full OAuth flow stub (`startOAuth`, `handleOAuthCallback`), mock polling with 30-second interval, and message ingestion via `MessageRepository` with `packageName="email"`. Created `EmailConfig.kt` for persisting OAuth tokens (access_token, refresh_token, expiry_time) to SharedPreferences with token validation and expiry checking (5-minute buffer). Added "Connect Email" button in `OverlayControlPanel.kt` in the Integrations section. Created unit tests in `EmailIntegrationTest.kt` (7 tests for MockEmail data class and constants) and instrumented tests in `EmailConfigTest.kt` (14 tests for token storage/retrieval). All tests pass.
 
 - [ ] Enhance Slack integration with proper error handling:
   - Read existing `app/src/main/java/com/yazan/jetoverlay/service/integration/SlackIntegration.kt`
