@@ -20,12 +20,13 @@ This phase implements the intelligence layer that processes incoming messages. M
   - Update `Message.kt` entity to add `bucket: String` field (Room migration needed)
   - **Completed:** Created MessageBucket enum with 6 buckets, each with displayName and color. Created MessageCategorizer with heuristic-based categorization. Added `bucket: String = "UNKNOWN"` field to Message entity. Created 51 unit tests in MessageCategorizerTest.kt and MessageBucketTest.kt - all passing.
 
-- [ ] Implement Room database migration for new fields:
+- [x] Implement Room database migration for new fields:
   - Update `app/src/main/java/com/yazan/jetoverlay/data/AppDatabase.kt`:
     - Increment database version to 2
     - Add Migration(1, 2) that adds `bucket` column with default "UNKNOWN"
   - Test migration works correctly with existing data
   - Ensure the migration is added to Room builder
+  - **Completed:** Updated AppDatabase to version 2 with MIGRATION_1_2 that adds `bucket` column via ALTER TABLE. Created comprehensive migration tests in AppDatabaseMigrationTest.kt (5 tests) verifying: single record migration, multiple records migration, Room compatibility after migration, empty database migration, and custom bucket values for new messages.
 
 - [ ] Enhance veiling logic in MessageProcessor:
   - Read existing `app/src/main/java/com/yazan/jetoverlay/domain/MessageProcessor.kt`
