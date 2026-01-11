@@ -1,5 +1,6 @@
 package com.yazan.jetoverlay.ui
 
+import android.util.Log
 import androidx.compose.animation.*
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.Spring
@@ -43,9 +44,12 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.yazan.jetoverlay.data.Message
 import com.yazan.jetoverlay.domain.MessageBucket
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.launch
 import kotlin.math.abs
 import kotlin.math.roundToInt
+
+private const val TAG = "FloatingBubble"
 
 @Composable
 fun FloatingBubble(
@@ -188,13 +192,17 @@ fun ExpandedMessageView(
     val verticalOffsetY = remember { Animatable(0f) }
 
     // Threshold for triggering swipe action (in dp converted to px)
-    val dismissThreshold = with(density) { 100.dp.toPx() }
-    val navigationThreshold = with(density) { 60.dp.toPx() }
+    val dismissThreshold = remember(density) { with(density) { 100.dp.toPx() } }
+    val navigationThreshold = remember(density) { with(density) { 60.dp.toPx() } }
 
-    // Alpha based on horizontal swipe for visual feedback
+    // Alpha based on horizontal swipe for visual feedback - cached with derivedStateOf
     val dismissAlpha by remember {
         derivedStateOf { 1f - (abs(horizontalOffsetX.value) / (dismissThreshold * 1.5f)).coerceIn(0f, 0.5f) }
     }
+
+    // Cache navigation state with derivedStateOf to prevent unnecessary recompositions
+    val hasNext by remember { derivedStateOf { uiState.hasNextMessage } }
+    val hasPrevious by remember { derivedStateOf { uiState.hasPreviousMessage } }
 
     Card(
         modifier = Modifier
@@ -206,69 +214,108 @@ fun ExpandedMessageView(
                 detectHorizontalDragGestures(
                     onDragEnd = {
                         scope.launch {
-                            if (horizontalOffsetX.value < -dismissThreshold) {
-                                // Swipe left past threshold - dismiss
-                                horizontalOffsetX.animateTo(-size.width.toFloat())
-                                uiState.dismissMessage()
-                            } else {
-                                // Snap back
-                                horizontalOffsetX.animateTo(0f, animationSpec = spring(stiffness = Spring.StiffnessMedium))
+                            try {
+                                if (horizontalOffsetX.value < -dismissThreshold) {
+                                    // Swipe left past threshold - dismiss
+                                    horizontalOffsetX.animateTo(-size.width.toFloat())
+                                    uiState.dismissMessage()
+                                } else {
+                                    // Snap back
+                                    horizontalOffsetX.animateTo(0f, animationSpec = spring(stiffness = Spring.StiffnessMedium))
+                                }
+                            } catch (e: CancellationException) {
+                                throw e
+                            } catch (e: Exception) {
+                                Log.e(TAG, "Error in horizontal drag end", e)
+                                // Try to snap back on error
+                                try { horizontalOffsetX.snapTo(0f) } catch (_: Exception) {}
                             }
                         }
                     },
                     onDragCancel = {
                         scope.launch {
-                            horizontalOffsetX.animateTo(0f, animationSpec = spring(stiffness = Spring.StiffnessMedium))
+                            try {
+                                horizontalOffsetX.animateTo(0f, animationSpec = spring(stiffness = Spring.StiffnessMedium))
+                            } catch (e: CancellationException) {
+                                throw e
+                            } catch (e: Exception) {
+                                Log.e(TAG, "Error in horizontal drag cancel", e)
+                            }
                         }
                     },
                     onHorizontalDrag = { _, dragAmount ->
                         scope.launch {
-                            // Only allow left swipe (negative values) for dismiss
-                            val newOffset = horizontalOffsetX.value + dragAmount
-                            horizontalOffsetX.snapTo(newOffset.coerceAtMost(0f))
+                            try {
+                                // Only allow left swipe (negative values) for dismiss
+                                val newOffset = horizontalOffsetX.value + dragAmount
+                                horizontalOffsetX.snapTo(newOffset.coerceAtMost(0f))
+                            } catch (e: CancellationException) {
+                                throw e
+                            } catch (e: Exception) {
+                                Log.e(TAG, "Error in horizontal drag", e)
+                            }
                         }
                     }
                 )
             }
-            .pointerInput(uiState.hasNextMessage, uiState.hasPreviousMessage) {
+            .pointerInput(hasNext, hasPrevious) {
                 detectVerticalDragGestures(
                     onDragEnd = {
                         scope.launch {
-                            when {
-                                // Swipe up past threshold - go to next message
-                                verticalOffsetY.value < -navigationThreshold && uiState.hasNextMessage -> {
-                                    verticalOffsetY.animateTo(-size.height.toFloat() / 2)
-                                    uiState.navigateToNextMessage()
-                                    verticalOffsetY.snapTo(0f)
+                            try {
+                                when {
+                                    // Swipe up past threshold - go to next message
+                                    verticalOffsetY.value < -navigationThreshold && uiState.hasNextMessage -> {
+                                        verticalOffsetY.animateTo(-size.height.toFloat() / 2)
+                                        uiState.navigateToNextMessage()
+                                        verticalOffsetY.snapTo(0f)
+                                    }
+                                    // Swipe down past threshold - go to previous message
+                                    verticalOffsetY.value > navigationThreshold && uiState.hasPreviousMessage -> {
+                                        verticalOffsetY.animateTo(size.height.toFloat() / 2)
+                                        uiState.navigateToPreviousMessage()
+                                        verticalOffsetY.snapTo(0f)
+                                    }
+                                    else -> {
+                                        // Snap back
+                                        verticalOffsetY.animateTo(0f, animationSpec = spring(stiffness = Spring.StiffnessMedium))
+                                    }
                                 }
-                                // Swipe down past threshold - go to previous message
-                                verticalOffsetY.value > navigationThreshold && uiState.hasPreviousMessage -> {
-                                    verticalOffsetY.animateTo(size.height.toFloat() / 2)
-                                    uiState.navigateToPreviousMessage()
-                                    verticalOffsetY.snapTo(0f)
-                                }
-                                else -> {
-                                    // Snap back
-                                    verticalOffsetY.animateTo(0f, animationSpec = spring(stiffness = Spring.StiffnessMedium))
-                                }
+                            } catch (e: CancellationException) {
+                                throw e
+                            } catch (e: Exception) {
+                                Log.e(TAG, "Error in vertical drag end", e)
+                                try { verticalOffsetY.snapTo(0f) } catch (_: Exception) {}
                             }
                         }
                     },
                     onDragCancel = {
                         scope.launch {
-                            verticalOffsetY.animateTo(0f, animationSpec = spring(stiffness = Spring.StiffnessMedium))
+                            try {
+                                verticalOffsetY.animateTo(0f, animationSpec = spring(stiffness = Spring.StiffnessMedium))
+                            } catch (e: CancellationException) {
+                                throw e
+                            } catch (e: Exception) {
+                                Log.e(TAG, "Error in vertical drag cancel", e)
+                            }
                         }
                     },
                     onVerticalDrag = { _, dragAmount ->
                         scope.launch {
-                            // Allow swipe up if there's a next message, swipe down if there's a previous
-                            val newOffset = verticalOffsetY.value + dragAmount
-                            val constrainedOffset = when {
-                                newOffset < 0 && uiState.hasNextMessage -> newOffset.coerceAtLeast(-navigationThreshold * 1.5f)
-                                newOffset > 0 && uiState.hasPreviousMessage -> newOffset.coerceAtMost(navigationThreshold * 1.5f)
-                                else -> 0f
+                            try {
+                                // Allow swipe up if there's a next message, swipe down if there's a previous
+                                val newOffset = verticalOffsetY.value + dragAmount
+                                val constrainedOffset = when {
+                                    newOffset < 0 && uiState.hasNextMessage -> newOffset.coerceAtLeast(-navigationThreshold * 1.5f)
+                                    newOffset > 0 && uiState.hasPreviousMessage -> newOffset.coerceAtMost(navigationThreshold * 1.5f)
+                                    else -> 0f
+                                }
+                                verticalOffsetY.snapTo(constrainedOffset)
+                            } catch (e: CancellationException) {
+                                throw e
+                            } catch (e: Exception) {
+                                Log.e(TAG, "Error in vertical drag", e)
                             }
-                            verticalOffsetY.snapTo(constrainedOffset)
                         }
                     }
                 )

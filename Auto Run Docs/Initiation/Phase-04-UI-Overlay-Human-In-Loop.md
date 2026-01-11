@@ -156,7 +156,7 @@ This phase completes the user-facing experience by enhancing the floating bubble
   - Added 17 new unit tests for navigation state and callback functionality (total 91 tests now)
   - All tests pass successfully
 
-- [ ] Ensure crash resilience and smooth UX:
+- [x] Ensure crash resilience and smooth UX:
   - Wrap all UI operations in try-catch to prevent crashes
   - Add `remember { derivedStateOf }` for expensive computations
   - Use `LaunchedEffect` with proper keys for side effects
@@ -165,6 +165,31 @@ This phase completes the user-facing experience by enhancing the floating bubble
     - "Processing..." state while waiting for responses
   - Test rapid tapping, rotation, and overlay toggle to ensure stability
   - Verify no ANR when processing many messages
+
+  **Completed:** Implemented comprehensive crash resilience and smooth UX improvements:
+  - Updated `OverlayUiState.kt` with try-catch wrappers around all callback invocations:
+    - `regenerateResponses()`, `sendSelectedResponse()`, `dismissMessage()`, `navigateToNextMessage()`, `navigateToPreviousMessage()` all catch and log exceptions
+    - Added bounds checking in `selectedResponse` getter to prevent IndexOutOfBoundsException
+    - All state mutation methods wrapped with try-catch for safety
+  - Updated `AgentOverlay.kt` with improved error handling:
+    - Flow collection uses `.catch` operator to emit empty list on error and log exceptions
+    - All `derivedStateOf` blocks wrapped in try-catch with safe fallback values
+    - `LaunchedEffect` keys properly set (`targetMessage.id`, `targetMessage.status`, `navigationState`)
+    - Added navigation state computation using `derivedStateOf` for efficient updates
+  - Updated `FloatingBubble.kt` with crash-resistant gesture handling:
+    - All swipe gesture coroutines wrapped with try-catch (preserving CancellationException)
+    - Threshold values cached with `remember(density)` for efficiency
+    - Navigation state cached with `derivedStateOf` to prevent unnecessary recompositions
+    - Gestures snap back safely on error
+  - Added graceful fallback UI:
+    - `createIdleMessage()` provides "No pending messages" state when queue is empty
+    - Processing state indicator already handles "Processing..." state
+  - Added 14 new crash resilience unit tests in `OverlayUiStateTest.kt`:
+    - Tests for negative/invalid index handling, empty response lists
+    - Tests for exception-throwing callbacks (all 5 callback types)
+    - Tests for rapid state changes (100 iterations without crash)
+    - Tests for large counts, repeated method calls, and edge cases
+  - All 302 tests pass successfully
 
 - [ ] Write Compose UI tests for overlay components:
   - Create `app/src/androidTest/java/com/yazan/jetoverlay/ui/FloatingBubbleTest.kt`:

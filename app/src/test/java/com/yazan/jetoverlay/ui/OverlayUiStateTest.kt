@@ -911,4 +911,120 @@ class OverlayUiStateTest {
         assertFalse(dismissCalled)
         assertFalse(sendCalled)
     }
+
+    // Crash resilience tests
+
+    @Test
+    fun `selectedResponse handles negative index gracefully`() {
+        val messageWithResponses = testMessage.copy(
+            generatedResponses = listOf("hello", "Got it!")
+        )
+        uiState.updateMessage(messageWithResponses)
+        uiState.selectedResponseIndex = -1 // Invalid negative index
+        assertEquals(null, uiState.selectedResponse)
+    }
+
+    @Test
+    fun `selectedResponse handles empty responses list gracefully`() {
+        val messageWithNoResponses = testMessage.copy(generatedResponses = emptyList())
+        uiState.updateMessage(messageWithNoResponses)
+        uiState.selectResponse(0) // Try to select when list is empty
+        assertEquals(null, uiState.selectedResponse)
+    }
+
+    @Test
+    fun `selectResponse handles null index without crash`() {
+        uiState.selectResponse(null)
+        assertEquals(null, uiState.selectedResponseIndex)
+    }
+
+    @Test
+    fun `callbacks handle exceptions gracefully - regenerate`() {
+        uiState.onRegenerateResponses = { throw RuntimeException("Test exception") }
+        // Should not throw, error is logged
+        uiState.regenerateResponses()
+    }
+
+    @Test
+    fun `callbacks handle exceptions gracefully - send`() {
+        val messageWithResponses = testMessage.copy(
+            generatedResponses = listOf("hello")
+        )
+        uiState.updateMessage(messageWithResponses)
+        uiState.selectResponse(0)
+        uiState.onSendResponse = { throw RuntimeException("Test exception") }
+        // Should not throw, error is logged
+        uiState.sendSelectedResponse()
+    }
+
+    @Test
+    fun `callbacks handle exceptions gracefully - dismiss`() {
+        uiState.onDismissMessage = { throw RuntimeException("Test exception") }
+        // Should not throw, error is logged
+        uiState.dismissMessage()
+    }
+
+    @Test
+    fun `callbacks handle exceptions gracefully - navigateNext`() {
+        uiState.updateNavigationState(hasNext = true, hasPrevious = false)
+        uiState.onNavigateToNextMessage = { throw RuntimeException("Test exception") }
+        // Should not throw, error is logged
+        uiState.navigateToNextMessage()
+    }
+
+    @Test
+    fun `callbacks handle exceptions gracefully - navigatePrevious`() {
+        uiState.updateNavigationState(hasNext = false, hasPrevious = true)
+        uiState.onNavigateToPreviousMessage = { throw RuntimeException("Test exception") }
+        // Should not throw, error is logged
+        uiState.navigateToPreviousMessage()
+    }
+
+    @Test
+    fun `rapid state changes do not cause crashes`() {
+        // Simulate rapid state changes
+        repeat(100) {
+            uiState.selectResponse(it % 3)
+            uiState.startEditing()
+            uiState.updateEditedResponse("Text $it")
+            uiState.cancelEditing()
+            uiState.toggleReveal()
+        }
+        // If we get here without exception, the test passes
+    }
+
+    @Test
+    fun `updatePendingCounts with very large counts does not crash`() {
+        val largeCounts = mapOf(
+            MessageBucket.URGENT to 1000000,
+            MessageBucket.WORK to 500000
+        )
+        uiState.updatePendingCounts(largeCounts)
+        // Should not crash
+        assertEquals(1500000, uiState.pendingMessageCount)
+    }
+
+    @Test
+    fun `resetResponseSelection called multiple times does not crash`() {
+        repeat(10) {
+            uiState.resetResponseSelection()
+        }
+        assertEquals(null, uiState.selectedResponseIndex)
+    }
+
+    @Test
+    fun `updateMessage with same message does not crash`() {
+        repeat(10) {
+            uiState.updateMessage(testMessage)
+        }
+        assertEquals(testMessage, uiState.message)
+    }
+
+    @Test
+    fun `startEditing then useEditedResponse without text is safe`() {
+        uiState.startEditing()
+        uiState.useEditedResponse() // Empty edited response
+        assertFalse(uiState.isEditing)
+        assertTrue(uiState.useEditedResponseFlag)
+    }
 }

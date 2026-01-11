@@ -1,11 +1,14 @@
 package com.yazan.jetoverlay.ui
 
+import android.util.Log
 import androidx.compose.runtime.Stable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import com.yazan.jetoverlay.data.Message
 import com.yazan.jetoverlay.domain.MessageBucket
+
+private const val TAG = "OverlayUiState"
 
 /**
  * Represents the processing state of the current message.
@@ -120,17 +123,25 @@ class OverlayUiState(
     var useEditedResponseFlag by mutableStateOf(false)
         private set
 
-    // Get the currently selected response text
+    // Get the currently selected response text (with crash resilience)
     val selectedResponse: String?
-        get() = when {
-            // When actively editing, use current edit text
-            isEditing && editedResponse.isNotBlank() -> editedResponse
-            // When user clicked "Use This", use the preserved edited response
-            useEditedResponseFlag && editedResponse.isNotBlank() -> editedResponse
-            // Otherwise use selected index from response chips
-            selectedResponseIndex != null && selectedResponseIndex!! < message.generatedResponses.size ->
-                message.generatedResponses[selectedResponseIndex!!]
-            else -> null
+        get() = try {
+            when {
+                // When actively editing, use current edit text
+                isEditing && editedResponse.isNotBlank() -> editedResponse
+                // When user clicked "Use This", use the preserved edited response
+                useEditedResponseFlag && editedResponse.isNotBlank() -> editedResponse
+                // Otherwise use selected index from response chips (with bounds checking)
+                selectedResponseIndex != null -> {
+                    val index = selectedResponseIndex!!
+                    val responses = message.generatedResponses
+                    if (index >= 0 && index < responses.size) responses[index] else null
+                }
+                else -> null
+            }
+        } catch (e: Exception) {
+            Log.e(TAG, "Error getting selectedResponse", e)
+            null
         }
 
     // Check if a valid response is selected or edited
@@ -138,72 +149,120 @@ class OverlayUiState(
         get() = selectedResponse != null
 
     fun selectResponse(index: Int?) {
-        selectedResponseIndex = index
-        // Exit editing mode when selecting a pre-generated response
-        if (index != null) {
-            isEditing = false
-            editedResponse = ""
-            useEditedResponseFlag = false
+        try {
+            selectedResponseIndex = index
+            // Exit editing mode when selecting a pre-generated response
+            if (index != null) {
+                isEditing = false
+                editedResponse = ""
+                useEditedResponseFlag = false
+            }
+        } catch (e: Exception) {
+            Log.e(TAG, "Error in selectResponse", e)
         }
     }
 
     fun startEditing() {
-        isEditing = true
-        // Pre-populate with selected response if available
-        editedResponse = selectedResponse ?: ""
+        try {
+            isEditing = true
+            // Pre-populate with selected response if available
+            editedResponse = selectedResponse ?: ""
+        } catch (e: Exception) {
+            Log.e(TAG, "Error in startEditing", e)
+        }
     }
 
     fun cancelEditing() {
-        isEditing = false
-        editedResponse = ""
+        try {
+            isEditing = false
+            editedResponse = ""
+        } catch (e: Exception) {
+            Log.e(TAG, "Error in cancelEditing", e)
+        }
     }
 
     fun updateEditedResponse(text: String) {
-        editedResponse = text
+        try {
+            editedResponse = text
+        } catch (e: Exception) {
+            Log.e(TAG, "Error in updateEditedResponse", e)
+        }
     }
 
     fun useEditedResponse() {
-        // Clear selected index to use edited response instead
-        selectedResponseIndex = null
-        isEditing = false
-        useEditedResponseFlag = true
+        try {
+            // Clear selected index to use edited response instead
+            selectedResponseIndex = null
+            isEditing = false
+            useEditedResponseFlag = true
+        } catch (e: Exception) {
+            Log.e(TAG, "Error in useEditedResponse", e)
+        }
     }
 
     fun regenerateResponses() {
-        onRegenerateResponses?.invoke()
+        try {
+            onRegenerateResponses?.invoke()
+        } catch (e: Exception) {
+            Log.e(TAG, "Error in regenerateResponses", e)
+        }
     }
 
     fun sendSelectedResponse() {
-        selectedResponse?.let { response ->
-            onSendResponse?.invoke(response)
+        try {
+            selectedResponse?.let { response ->
+                onSendResponse?.invoke(response)
+            }
+        } catch (e: Exception) {
+            Log.e(TAG, "Error in sendSelectedResponse", e)
         }
     }
 
     fun dismissMessage() {
-        onDismissMessage?.invoke()
+        try {
+            onDismissMessage?.invoke()
+        } catch (e: Exception) {
+            Log.e(TAG, "Error in dismissMessage", e)
+        }
     }
 
     fun resetResponseSelection() {
-        selectedResponseIndex = null
-        isEditing = false
-        editedResponse = ""
-        useEditedResponseFlag = false
+        try {
+            selectedResponseIndex = null
+            isEditing = false
+            editedResponse = ""
+            useEditedResponseFlag = false
+        } catch (e: Exception) {
+            Log.e(TAG, "Error in resetResponseSelection", e)
+        }
     }
 
     fun updateNavigationState(hasNext: Boolean, hasPrevious: Boolean) {
-        hasNextMessage = hasNext
-        hasPreviousMessage = hasPrevious
+        try {
+            hasNextMessage = hasNext
+            hasPreviousMessage = hasPrevious
+        } catch (e: Exception) {
+            Log.e(TAG, "Error in updateNavigationState", e)
+        }
     }
 
     fun navigateToNextMessage() {
-        if (hasNextMessage) {
-            onNavigateToNextMessage?.invoke()
+        try {
+            if (hasNextMessage) {
+                onNavigateToNextMessage?.invoke()
+            }
+        } catch (e: Exception) {
+            Log.e(TAG, "Error in navigateToNextMessage", e)
         }
     }
 
     fun navigateToPreviousMessage() {
-        if (hasPreviousMessage) {
-            onNavigateToPreviousMessage?.invoke()
+        try {
+            if (hasPreviousMessage) {
+                onNavigateToPreviousMessage?.invoke()
+            }
+        } catch (e: Exception) {
+            Log.e(TAG, "Error in navigateToPreviousMessage", e)
         }
     }
 }
