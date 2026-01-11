@@ -28,7 +28,7 @@ This phase implements the intelligence layer that processes incoming messages. M
   - Ensure the migration is added to Room builder
   - **Completed:** Updated AppDatabase to version 2 with MIGRATION_1_2 that adds `bucket` column via ALTER TABLE. Created comprehensive migration tests in AppDatabaseMigrationTest.kt (5 tests) verifying: single record migration, multiple records migration, Room compatibility after migration, empty database migration, and custom bucket values for new messages.
 
-- [ ] Enhance veiling logic in MessageProcessor:
+- [x] Enhance veiling logic in MessageProcessor:
   - Read existing `app/src/main/java/com/yazan/jetoverlay/domain/MessageProcessor.kt`
   - Create `app/src/main/java/com/yazan/jetoverlay/domain/VeilGenerator.kt`:
     - Class with `generateVeil(message: Message, bucket: MessageBucket): String` method
@@ -41,6 +41,7 @@ This phase implements the intelligence layer that processes incoming messages. M
       - UNKNOWN: "New notification"
     - Never reveal actual message content in the veil
   - Update MessageProcessor to use VeilGenerator and MessageCategorizer
+  - **Completed:** Created VeilGenerator class with bucket-based veil generation, sender sanitization (removes XSS-prone characters), and app name extraction for work notifications. Updated MessageProcessor to inject and use MessageCategorizer and VeilGenerator. Added bucket parameter to MessageRepository.updateMessageState(). Created 28 unit tests in VeilGeneratorTest.kt verifying all bucket types, content leak prevention, and edge cases - all passing.
 
 - [ ] Create stubbed LLM service for response generation:
   - Create `app/src/main/java/com/yazan/jetoverlay/domain/LlmService.kt`:

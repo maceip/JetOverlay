@@ -64,14 +64,16 @@ class MessageRepository(private val messageDao: MessageDao) {
         id: Long,
         status: String,
         veiledContent: String? = null,
-        generatedResponses: List<String> = emptyList()
+        generatedResponses: List<String> = emptyList(),
+        bucket: String? = null
     ) {
         val message = messageDao.getMessageById(id)
         if (message != null) {
             val updated = message.copy(
                 status = status,
                 veiledContent = veiledContent ?: message.veiledContent,
-                generatedResponses = generatedResponses.ifEmpty { message.generatedResponses }
+                generatedResponses = generatedResponses.ifEmpty { message.generatedResponses },
+                bucket = bucket ?: message.bucket
             )
             messageDao.update(updated)
         }
