@@ -1,0 +1,100 @@
+# Phase 01: Architecture Review & E2E Testing Harness
+
+This phase establishes the foundation for confident development by auditing the existing architecture for Android 16 compatibility and lifecycle durability, then setting up a complete E2E testing harness using the Android emulator. By the end of this phase, you will have a documented architecture review, identified fragility points, and a working test infrastructure that can verify the overlay lifecycle, notification handling, and core data flows. This ensures no guesswork commits and gives the team confidence that the existing system is sound before building new features.
+
+## Tasks
+
+- [ ] Audit overlay lifecycle and Android 16 compatibility:
+  - Read `jetoverlay/src/main/java/com/yazan/jetoverlay/service/OverlayService.kt` thoroughly
+  - Read `jetoverlay/src/main/java/com/yazan/jetoverlay/internal/OverlayViewWrapper.kt` thoroughly
+  - Analyze WindowManager lifecycle handling (attach/detach, configuration changes)
+  - Check for proper handling of `FOREGROUND_SERVICE_TYPE_SPECIAL_USE` on Android 14+
+  - Verify lifecycle callbacks align with Android 16 behavior (ON_RESUME, ON_DESTROY)
+  - Review drag gesture handling for potential ANR scenarios
+  - Document findings in `docs/architecture/overlay-lifecycle-audit.md` with front matter:
+    - type: analysis, tags: [architecture, android-16, overlay, lifecycle]
+  - List any fragility points or recommended fixes
+
+- [ ] Audit Hilt/DI setup and service architecture:
+  - Read `app/src/main/java/com/yazan/jetoverlay/JetOverlayApplication.kt`
+  - Read `app/src/main/java/com/yazan/jetoverlay/service/AppNotificationListenerService.kt`
+  - Analyze current dependency injection approach (singleton pattern vs Hilt)
+  - Identify testability concerns with current DI approach
+  - Review service initialization order and potential race conditions
+  - Check for memory leaks in service-to-repository bindings
+  - Document findings in `docs/architecture/di-service-audit.md` with front matter:
+    - type: analysis, tags: [architecture, dependency-injection, services]
+  - Include recommendations for improving testability
+
+- [ ] Audit data layer and Room database implementation:
+  - Read `app/src/main/java/com/yazan/jetoverlay/data/AppDatabase.kt`
+  - Read `app/src/main/java/com/yazan/jetoverlay/data/Message.kt`
+  - Read `app/src/main/java/com/yazan/jetoverlay/data/MessageDao.kt`
+  - Read `app/src/main/java/com/yazan/jetoverlay/data/MessageRepository.kt`
+  - Verify Room schema is correct and type converters handle edge cases
+  - Check Flow emissions for potential UI thread issues
+  - Review ReplyActionCache for memory leak potential
+  - Document findings in `docs/architecture/data-layer-audit.md` with front matter:
+    - type: analysis, tags: [architecture, room, data-layer]
+
+- [ ] Audit MessageProcessor (Brain) and notification handling:
+  - Read `app/src/main/java/com/yazan/jetoverlay/domain/MessageProcessor.kt`
+  - Read `app/src/main/java/com/yazan/jetoverlay/service/notification/NotificationFilter.kt`
+  - Read `app/src/main/java/com/yazan/jetoverlay/service/notification/NotificationMapper.kt`
+  - Analyze coroutine scope management and cancellation handling
+  - Check for proper error handling in message processing flow
+  - Verify SupervisorJob usage and exception propagation
+  - Document findings in `docs/architecture/brain-audit.md` with front matter:
+    - type: analysis, tags: [architecture, message-processing, coroutines]
+
+- [ ] Create architecture summary with fragility matrix:
+  - Create `docs/architecture/fragility-matrix.md` consolidating all audit findings
+  - Include front matter: type: report, tags: [architecture, summary, fragility]
+  - Create a risk matrix table with columns: Component, Risk Level (Low/Medium/High), Issue, Recommendation
+  - Link to individual audit documents using `[[document-name]]` wiki-links
+  - Prioritize issues that could cause crashes or ANRs
+  - Include a "Quick Wins" section for easy fixes
+
+- [ ] Set up Android emulator for E2E testing:
+  - Check if Android SDK and emulator are available on the system via command line tools
+  - If not present, document the manual steps needed in `docs/testing/emulator-setup.md`
+  - Create or identify an AVD configuration targeting API 34+ (Android 14+)
+  - Verify the emulator can start and run the application
+  - Document the emulator configuration and launch commands
+  - Include front matter: type: reference, tags: [testing, emulator, setup]
+
+- [ ] Create E2E test infrastructure for the app module:
+  - Create `app/src/androidTest/java/com/yazan/jetoverlay/BaseAndroidTest.kt`:
+    - Base test class with common setup/teardown
+    - ActivityScenario utilities for MainActivity
+    - Helper methods for granting overlay permissions in tests
+  - Create `app/src/androidTest/java/com/yazan/jetoverlay/TestUtils.kt`:
+    - Utility functions for waiting on UI state changes
+    - Helper for simulating notification posts (if possible via instrumentation)
+    - Timeout constants and retry logic
+  - Update `app/build.gradle.kts` if needed to add test dependencies (MockK, Turbine for Flow testing)
+
+- [ ] Create Room database tests:
+  - Create `app/src/androidTest/java/com/yazan/jetoverlay/data/MessageDaoTest.kt`:
+    - Test insert and retrieve messages
+    - Test Flow emissions on data changes
+    - Test getAllMessages ordering (timestamp DESC)
+    - Test update and delete operations
+  - Use in-memory Room database for test isolation
+  - Verify type converters work correctly for List<String> serialization
+
+- [ ] Create overlay lifecycle integration tests:
+  - Create `app/src/androidTest/java/com/yazan/jetoverlay/service/OverlayServiceTest.kt`:
+    - Test service starts correctly as foreground service
+    - Test overlay appears when OverlaySdk.show() is called
+    - Test overlay disappears when OverlaySdk.hide() is called
+    - Test service survives configuration changes
+  - These tests validate the core overlay mechanism works end-to-end
+
+- [ ] Run all tests and verify green state:
+  - Execute `./gradlew connectedAndroidTest` on the emulator
+  - Capture test results and any failures
+  - Fix any immediate test infrastructure issues
+  - Document test execution process in `docs/testing/running-tests.md` with front matter:
+    - type: reference, tags: [testing, ci, commands]
+  - Confirm all tests pass before proceeding to Phase 2
