@@ -92,7 +92,7 @@ This phase completes the user-facing experience by enhancing the floating bubble
   - Added 11 new unit tests for editing workflow including flag behavior (total 79 tests now)
   - All tests pass successfully
 
-- [ ] Implement send/dismiss flow:
+- [x] Implement send/dismiss flow:
   - Create `app/src/main/java/com/yazan/jetoverlay/domain/ResponseSender.kt`:
     - Class that handles sending responses via the original notification's reply action
     - Uses ReplyActionCache to retrieve the PendingIntent
@@ -103,6 +103,28 @@ This phase completes the user-facing experience by enhancing the floating bubble
     - `markAsSent()` sets status=SENT after successful send
     - `dismiss()` sets status=DISMISSED without sending
   - Add "Dismiss" button (X) to card header that dismisses without responding
+
+  **Completed:** Implemented complete send/dismiss flow:
+  - Created `ResponseSender.kt` in domain package with:
+    - `SendResult` sealed class with `Success` and `Error(message)` variants
+    - `sendResponse(messageId, responseText)` method that retrieves cached reply action, builds RemoteInput, and fires PendingIntent
+    - Input validation for blank response text
+    - `hasReplyAction(messageId)` helper method to check if reply action is cached
+    - `getRemoteInputKey(messageId)` for debugging/validation
+    - Automatic cleanup of cached action after successful send
+  - Added `dismiss(id)` method to `MessageRepository` that sets status to "DISMISSED"
+  - Updated `OverlayUiState.kt` with:
+    - `onDismissMessage` callback property
+    - `dismissMessage()` method to invoke callback
+  - Updated `FloatingBubble.kt` expanded card header:
+    - Added dismiss button (X icon with error color) next to collapse button
+    - Dismiss button calls `uiState.dismissMessage()`
+    - Collapse button now uses KeyboardArrowDown icon for differentiation
+  - Added 26 new unit tests:
+    - `ResponseSenderTest.kt` with 19 tests covering ReplyActionCache operations, SendResult types, validation logic, and edge cases
+    - 7 new tests in `OverlayUiStateTest.kt` for dismiss callback functionality
+    - 9 new tests in `MessageRepositoryTest.kt` for dismiss, queueForSending, and markAsSent methods
+  - All 88 tests pass successfully (total test count now)
 
 - [ ] Add swipe gestures for quick actions:
   - Implement swipe-to-dismiss on expanded card:

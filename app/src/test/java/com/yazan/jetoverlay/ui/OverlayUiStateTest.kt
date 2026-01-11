@@ -708,4 +708,67 @@ class OverlayUiStateTest {
         // because selectedResponseIndex is null and editedResponse is preserved
         assertEquals("Final response text", sentResponse)
     }
+
+    // Dismiss message callback tests
+
+    @Test
+    fun `initial onDismissMessage callback is null`() {
+        assertEquals(null, uiState.onDismissMessage)
+    }
+
+    @Test
+    fun `dismissMessage invokes callback`() {
+        var callbackInvoked = false
+        uiState.onDismissMessage = { callbackInvoked = true }
+        uiState.dismissMessage()
+        assertTrue(callbackInvoked)
+    }
+
+    @Test
+    fun `dismissMessage does nothing when callback is null`() {
+        uiState.onDismissMessage = null
+        uiState.dismissMessage() // Should not throw
+    }
+
+    @Test
+    fun `onDismissMessage can be set and invoked multiple times`() {
+        var invokeCount = 0
+        uiState.onDismissMessage = { invokeCount++ }
+        uiState.dismissMessage()
+        uiState.dismissMessage()
+        uiState.dismissMessage()
+        assertEquals(3, invokeCount)
+    }
+
+    @Test
+    fun `onDismissMessage callback can be changed`() {
+        var firstCallbackInvoked = false
+        var secondCallbackInvoked = false
+
+        uiState.onDismissMessage = { firstCallbackInvoked = true }
+        uiState.dismissMessage()
+        assertTrue(firstCallbackInvoked)
+        assertFalse(secondCallbackInvoked)
+
+        uiState.onDismissMessage = { secondCallbackInvoked = true }
+        uiState.dismissMessage()
+        assertTrue(secondCallbackInvoked)
+    }
+
+    @Test
+    fun `dismissMessage works independently of other callbacks`() {
+        var dismissCalled = false
+        var sendCalled = false
+        var regenerateCalled = false
+
+        uiState.onDismissMessage = { dismissCalled = true }
+        uiState.onSendResponse = { sendCalled = true }
+        uiState.onRegenerateResponses = { regenerateCalled = true }
+
+        uiState.dismissMessage()
+
+        assertTrue(dismissCalled)
+        assertFalse(sendCalled)
+        assertFalse(regenerateCalled)
+    }
 }

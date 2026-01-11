@@ -66,6 +66,16 @@ class MessageRepository(private val messageDao: MessageDao) {
         }
     }
 
+    suspend fun dismiss(id: Long) {
+        val message = messageDao.getMessageById(id)
+        if (message != null) {
+            val updated = message.copy(
+                status = "DISMISSED"
+            )
+            messageDao.update(updated)
+        }
+    }
+
     suspend fun updateMessageState(
         id: Long,
         status: String,

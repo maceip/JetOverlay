@@ -52,6 +52,7 @@ class OverlayUiState(
     // Callbacks for actions (set by the overlay controller)
     var onRegenerateResponses: (() -> Unit)? = null
     var onSendResponse: ((String) -> Unit)? = null
+    var onDismissMessage: (() -> Unit)? = null
 
     // Derived states
     val displayContent: String
@@ -170,6 +171,10 @@ class OverlayUiState(
         selectedResponse?.let { response ->
             onSendResponse?.invoke(response)
         }
+    }
+
+    fun dismissMessage() {
+        onDismissMessage?.invoke()
     }
 
     fun resetResponseSelection() {

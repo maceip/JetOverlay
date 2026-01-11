@@ -6,6 +6,7 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
@@ -201,6 +202,114 @@ class MessageRepositoryTest {
         val result = testRepository.allMessages.first()
 
         assertEquals(2, result.size)
+    }
+
+    // ==================== Dismiss Tests ====================
+
+    @Test
+    fun `dismiss sets message status to DISMISSED`() = runBlocking {
+        val message = createMessage(id = 1L, bucket = "SOCIAL")
+        fakeDao.messages[1L] = message
+
+        repository.dismiss(1L)
+
+        val updatedMessage = fakeDao.messages[1L]
+        assertEquals("DISMISSED", updatedMessage?.status)
+    }
+
+    @Test
+    fun `dismiss does not change other message fields`() = runBlocking {
+        val message = createMessage(id = 1L, bucket = "WORK", content = "Original content", sender = "Original Sender")
+        fakeDao.messages[1L] = message
+
+        repository.dismiss(1L)
+
+        val updatedMessage = fakeDao.messages[1L]
+        assertEquals("Original content", updatedMessage?.originalContent)
+        assertEquals("Original Sender", updatedMessage?.senderName)
+        assertEquals("WORK", updatedMessage?.bucket)
+        assertEquals("DISMISSED", updatedMessage?.status)
+    }
+
+    @Test
+    fun `dismiss with non-existent id does nothing`() = runBlocking {
+        // Should not throw
+        repository.dismiss(999L)
+        assertFalse(fakeDao.messages.containsKey(999L))
+    }
+
+    @Test
+    fun `dismiss handles id of 0`() = runBlocking {
+        val message = createMessage(id = 0L, bucket = "SOCIAL")
+        fakeDao.messages[0L] = message
+
+        repository.dismiss(0L)
+
+        val updatedMessage = fakeDao.messages[0L]
+        assertEquals("DISMISSED", updatedMessage?.status)
+    }
+
+    @Test
+    fun `dismiss handles large id`() = runBlocking {
+        val message = createMessage(id = Long.MAX_VALUE, bucket = "URGENT")
+        fakeDao.messages[Long.MAX_VALUE] = message
+
+        repository.dismiss(Long.MAX_VALUE)
+
+        val updatedMessage = fakeDao.messages[Long.MAX_VALUE]
+        assertEquals("DISMISSED", updatedMessage?.status)
+    }
+
+    @Test
+    fun `dismiss can be called multiple times on same message`() = runBlocking {
+        val message = createMessage(id = 1L, bucket = "SOCIAL")
+        fakeDao.messages[1L] = message
+
+        repository.dismiss(1L)
+        repository.dismiss(1L)
+        repository.dismiss(1L)
+
+        val updatedMessage = fakeDao.messages[1L]
+        assertEquals("DISMISSED", updatedMessage?.status)
+    }
+
+    // ==================== queueForSending Tests ====================
+
+    @Test
+    fun `queueForSending sets status to QUEUED and selectedResponse`() = runBlocking {
+        val message = createMessage(id = 1L, bucket = "SOCIAL")
+        fakeDao.messages[1L] = message
+
+        repository.queueForSending(1L, "Got it!")
+
+        val updatedMessage = fakeDao.messages[1L]
+        assertEquals("QUEUED", updatedMessage?.status)
+        assertEquals("Got it!", updatedMessage?.selectedResponse)
+    }
+
+    @Test
+    fun `queueForSending with non-existent id does nothing`() = runBlocking {
+        repository.queueForSending(999L, "Response")
+        assertFalse(fakeDao.messages.containsKey(999L))
+    }
+
+    // ==================== markAsSent Tests ====================
+
+    @Test
+    fun `markAsSent sets status to SENT`() = runBlocking {
+        val message = createMessage(id = 1L, bucket = "SOCIAL")
+        fakeDao.messages[1L] = message
+
+        repository.markAsSent(1L)
+
+        val updatedMessage = fakeDao.messages[1L]
+        assertEquals("SENT", updatedMessage?.status)
+    }
+
+    @Test
+    fun `markAsSent with non-existent id does nothing`() = runBlocking {
+        repository.markAsSent(999L)
+        assertFalse(fakeDao.messages.containsKey(999L))
     }
 
     // ==================== Helper ====================
