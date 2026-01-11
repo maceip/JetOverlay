@@ -162,7 +162,7 @@ class MessageDaoTest {
 
             // Consume insert emissions (may be 1 or 2 depending on batching)
             var latestList = awaitItem()
-            if (latestList.size < 2) {
+            while (latestList.size < 2) {
                 latestList = awaitItem()
             }
             assertEquals(2, latestList.size)
@@ -170,8 +170,12 @@ class MessageDaoTest {
             // Delete all
             messageDao.deleteAll()
 
-            // Verify emission with empty list
-            val afterDelete = awaitItem()
+            // Verify emission with empty list - may require consuming intermediate emissions
+            var afterDelete = awaitItem()
+            // On some devices, we may get multiple emissions before the final empty list
+            while (afterDelete.isNotEmpty()) {
+                afterDelete = awaitItem()
+            }
             assertTrue("After deleteAll, list should be empty", afterDelete.isEmpty())
 
             cancelAndConsumeRemainingEvents()

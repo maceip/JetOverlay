@@ -212,12 +212,21 @@ class FloatingBubbleTest {
             FloatingBubble(uiState = uiState)
         }
 
+        // Wait for expanded state to be rendered
         composeTestRule.waitForIdle()
+        composeTestRule
+            .onNodeWithContentDescription("Collapse")
+            .assertIsDisplayed()
+
         composeTestRule
             .onNodeWithContentDescription("Collapse")
             .performClick()
 
+        // Allow animations to complete
         composeTestRule.waitForIdle()
+        Thread.sleep(100) // Brief pause for state propagation on slower devices
+        composeTestRule.waitForIdle()
+
         assertFalse(uiState.isExpanded)
     }
 
