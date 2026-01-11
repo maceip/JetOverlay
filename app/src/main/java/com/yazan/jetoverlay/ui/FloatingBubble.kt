@@ -1,6 +1,7 @@
 package com.yazan.jetoverlay.ui
 
 import androidx.compose.animation.*
+import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.spring
@@ -8,6 +9,8 @@ import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.detectHorizontalDragGestures
+import androidx.compose.foundation.gestures.detectVerticalDragGestures
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
@@ -21,6 +24,7 @@ import androidx.compose.material.icons.automirrored.filled.Send
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.Refresh
+import androidx.compose.material.icons.filled.KeyboardArrowUp
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -29,13 +33,19 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.yazan.jetoverlay.api.OverlaySdk
 import com.yazan.jetoverlay.data.Message
 import com.yazan.jetoverlay.domain.MessageBucket
+import kotlinx.coroutines.launch
+import kotlin.math.abs
+import kotlin.math.roundToInt
 
 @Composable
 fun FloatingBubble(
@@ -169,10 +179,100 @@ fun ExpandedMessageView(
     uiState: OverlayUiState,
     onCollapse: () -> Unit
 ) {
+    val scope = rememberCoroutineScope()
+    val density = LocalDensity.current
+
+    // Horizontal swipe offset for dismiss gesture
+    val horizontalOffsetX = remember { Animatable(0f) }
+    // Vertical swipe offset for navigation gesture
+    val verticalOffsetY = remember { Animatable(0f) }
+
+    // Threshold for triggering swipe action (in dp converted to px)
+    val dismissThreshold = with(density) { 100.dp.toPx() }
+    val navigationThreshold = with(density) { 60.dp.toPx() }
+
+    // Alpha based on horizontal swipe for visual feedback
+    val dismissAlpha by remember {
+        derivedStateOf { 1f - (abs(horizontalOffsetX.value) / (dismissThreshold * 1.5f)).coerceIn(0f, 0.5f) }
+    }
+
     Card(
         modifier = Modifier
-            .width(320.dp) // Slightly wider for action buttons
-            .wrapContentHeight(),
+            .offset { IntOffset(horizontalOffsetX.value.roundToInt(), verticalOffsetY.value.roundToInt()) }
+            .graphicsLayer { alpha = dismissAlpha }
+            .width(320.dp)
+            .wrapContentHeight()
+            .pointerInput(Unit) {
+                detectHorizontalDragGestures(
+                    onDragEnd = {
+                        scope.launch {
+                            if (horizontalOffsetX.value < -dismissThreshold) {
+                                // Swipe left past threshold - dismiss
+                                horizontalOffsetX.animateTo(-size.width.toFloat())
+                                uiState.dismissMessage()
+                            } else {
+                                // Snap back
+                                horizontalOffsetX.animateTo(0f, animationSpec = spring(stiffness = Spring.StiffnessMedium))
+                            }
+                        }
+                    },
+                    onDragCancel = {
+                        scope.launch {
+                            horizontalOffsetX.animateTo(0f, animationSpec = spring(stiffness = Spring.StiffnessMedium))
+                        }
+                    },
+                    onHorizontalDrag = { _, dragAmount ->
+                        scope.launch {
+                            // Only allow left swipe (negative values) for dismiss
+                            val newOffset = horizontalOffsetX.value + dragAmount
+                            horizontalOffsetX.snapTo(newOffset.coerceAtMost(0f))
+                        }
+                    }
+                )
+            }
+            .pointerInput(uiState.hasNextMessage, uiState.hasPreviousMessage) {
+                detectVerticalDragGestures(
+                    onDragEnd = {
+                        scope.launch {
+                            when {
+                                // Swipe up past threshold - go to next message
+                                verticalOffsetY.value < -navigationThreshold && uiState.hasNextMessage -> {
+                                    verticalOffsetY.animateTo(-size.height.toFloat() / 2)
+                                    uiState.navigateToNextMessage()
+                                    verticalOffsetY.snapTo(0f)
+                                }
+                                // Swipe down past threshold - go to previous message
+                                verticalOffsetY.value > navigationThreshold && uiState.hasPreviousMessage -> {
+                                    verticalOffsetY.animateTo(size.height.toFloat() / 2)
+                                    uiState.navigateToPreviousMessage()
+                                    verticalOffsetY.snapTo(0f)
+                                }
+                                else -> {
+                                    // Snap back
+                                    verticalOffsetY.animateTo(0f, animationSpec = spring(stiffness = Spring.StiffnessMedium))
+                                }
+                            }
+                        }
+                    },
+                    onDragCancel = {
+                        scope.launch {
+                            verticalOffsetY.animateTo(0f, animationSpec = spring(stiffness = Spring.StiffnessMedium))
+                        }
+                    },
+                    onVerticalDrag = { _, dragAmount ->
+                        scope.launch {
+                            // Allow swipe up if there's a next message, swipe down if there's a previous
+                            val newOffset = verticalOffsetY.value + dragAmount
+                            val constrainedOffset = when {
+                                newOffset < 0 && uiState.hasNextMessage -> newOffset.coerceAtLeast(-navigationThreshold * 1.5f)
+                                newOffset > 0 && uiState.hasPreviousMessage -> newOffset.coerceAtMost(navigationThreshold * 1.5f)
+                                else -> 0f
+                            }
+                            verticalOffsetY.snapTo(constrainedOffset)
+                        }
+                    }
+                )
+            },
         shape = RoundedCornerShape(16.dp),
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
         elevation = CardDefaults.cardElevation(defaultElevation = 8.dp)
@@ -311,6 +411,57 @@ fun ExpandedMessageView(
                     }
                 }
             }
+
+            // Navigation indicators showing swipe hints
+            if (uiState.hasNextMessage || uiState.hasPreviousMessage) {
+                Spacer(modifier = Modifier.height(8.dp))
+                SwipeNavigationIndicator(
+                    hasNext = uiState.hasNextMessage,
+                    hasPrevious = uiState.hasPreviousMessage
+                )
+            }
+        }
+    }
+}
+
+/**
+ * Visual indicator showing available swipe directions for message navigation.
+ */
+@Composable
+fun SwipeNavigationIndicator(
+    hasNext: Boolean,
+    hasPrevious: Boolean
+) {
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.Center,
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        if (hasPrevious) {
+            Icon(
+                imageVector = Icons.Default.KeyboardArrowDown,
+                contentDescription = "Swipe down for previous",
+                tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f),
+                modifier = Modifier.size(16.dp)
+            )
+        }
+        Text(
+            text = when {
+                hasNext && hasPrevious -> "Swipe up/down to navigate"
+                hasNext -> "Swipe up for next"
+                hasPrevious -> "Swipe down for previous"
+                else -> ""
+            },
+            style = MaterialTheme.typography.labelSmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f)
+        )
+        if (hasNext) {
+            Icon(
+                imageVector = Icons.Default.KeyboardArrowUp,
+                contentDescription = "Swipe up for next",
+                tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f),
+                modifier = Modifier.size(16.dp)
+            )
         }
     }
 }

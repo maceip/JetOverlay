@@ -126,13 +126,35 @@ This phase completes the user-facing experience by enhancing the floating bubble
     - 9 new tests in `MessageRepositoryTest.kt` for dismiss, queueForSending, and markAsSent methods
   - All 88 tests pass successfully (total test count now)
 
-- [ ] Add swipe gestures for quick actions:
+- [x] Add swipe gestures for quick actions:
   - Implement swipe-to-dismiss on expanded card:
     - Swipe left to dismiss message
     - Use `SwipeToDismissBox` or custom `detectHorizontalDragGestures`
   - Implement swipe between messages:
     - Swipe up/down to navigate to next/previous pending message
     - Show subtle animation indicating more messages available
+
+  **Completed:** Implemented swipe gestures for quick actions in `FloatingBubble.kt` and `OverlayUiState.kt`:
+  - Added horizontal swipe-to-dismiss using `detectHorizontalDragGestures`:
+    - Swipe left past 100dp threshold triggers `dismissMessage()` callback
+    - Card fades out as it's swiped (alpha based on swipe distance)
+    - Snaps back smoothly if released before threshold
+    - Only allows left swipe (negative direction)
+  - Added vertical swipe navigation using `detectVerticalDragGestures`:
+    - Swipe up past 60dp threshold navigates to next message (if available)
+    - Swipe down past 60dp threshold navigates to previous message (if available)
+    - Constrained drag based on `hasNextMessage`/`hasPreviousMessage` state
+    - Snaps back if no more messages in that direction
+  - Created `SwipeNavigationIndicator` composable:
+    - Shows directional hints (arrows + text) when navigation is available
+    - Dynamically displays "Swipe up for next", "Swipe down for previous", or both
+  - Updated `OverlayUiState.kt` with:
+    - `hasNextMessage` and `hasPreviousMessage` state properties
+    - `onNavigateToNextMessage` and `onNavigateToPreviousMessage` callbacks
+    - `updateNavigationState()`, `navigateToNextMessage()`, `navigateToPreviousMessage()` methods
+    - Navigation only invokes callback if corresponding direction has messages
+  - Added 17 new unit tests for navigation state and callback functionality (total 91 tests now)
+  - All tests pass successfully
 
 - [ ] Ensure crash resilience and smooth UX:
   - Wrap all UI operations in try-catch to prevent crashes

@@ -30,6 +30,10 @@ class OverlayUiState(
     // Count of pending messages (not SENT or DISMISSED)
     var pendingMessageCount by mutableStateOf(0)
 
+    // Navigation state - indicates if there are more messages above/below
+    var hasNextMessage by mutableStateOf(false)
+    var hasPreviousMessage by mutableStateOf(false)
+
     // Current bucket of the message for color coding
     val currentBucket: MessageBucket
         get() = MessageBucket.fromString(message.bucket)
@@ -53,6 +57,8 @@ class OverlayUiState(
     var onRegenerateResponses: (() -> Unit)? = null
     var onSendResponse: ((String) -> Unit)? = null
     var onDismissMessage: (() -> Unit)? = null
+    var onNavigateToNextMessage: (() -> Unit)? = null
+    var onNavigateToPreviousMessage: (() -> Unit)? = null
 
     // Derived states
     val displayContent: String
@@ -182,5 +188,22 @@ class OverlayUiState(
         isEditing = false
         editedResponse = ""
         useEditedResponseFlag = false
+    }
+
+    fun updateNavigationState(hasNext: Boolean, hasPrevious: Boolean) {
+        hasNextMessage = hasNext
+        hasPreviousMessage = hasPrevious
+    }
+
+    fun navigateToNextMessage() {
+        if (hasNextMessage) {
+            onNavigateToNextMessage?.invoke()
+        }
+    }
+
+    fun navigateToPreviousMessage() {
+        if (hasPreviousMessage) {
+            onNavigateToPreviousMessage?.invoke()
+        }
     }
 }

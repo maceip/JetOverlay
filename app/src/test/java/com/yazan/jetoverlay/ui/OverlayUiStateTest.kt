@@ -771,4 +771,144 @@ class OverlayUiStateTest {
         assertFalse(sendCalled)
         assertFalse(regenerateCalled)
     }
+
+    // Navigation state tests
+
+    @Test
+    fun `initial hasNextMessage is false`() {
+        assertFalse(uiState.hasNextMessage)
+    }
+
+    @Test
+    fun `initial hasPreviousMessage is false`() {
+        assertFalse(uiState.hasPreviousMessage)
+    }
+
+    @Test
+    fun `updateNavigationState sets hasNextMessage correctly`() {
+        uiState.updateNavigationState(hasNext = true, hasPrevious = false)
+        assertTrue(uiState.hasNextMessage)
+        assertFalse(uiState.hasPreviousMessage)
+    }
+
+    @Test
+    fun `updateNavigationState sets hasPreviousMessage correctly`() {
+        uiState.updateNavigationState(hasNext = false, hasPrevious = true)
+        assertFalse(uiState.hasNextMessage)
+        assertTrue(uiState.hasPreviousMessage)
+    }
+
+    @Test
+    fun `updateNavigationState sets both values correctly`() {
+        uiState.updateNavigationState(hasNext = true, hasPrevious = true)
+        assertTrue(uiState.hasNextMessage)
+        assertTrue(uiState.hasPreviousMessage)
+    }
+
+    @Test
+    fun `updateNavigationState can reset both to false`() {
+        uiState.updateNavigationState(hasNext = true, hasPrevious = true)
+        uiState.updateNavigationState(hasNext = false, hasPrevious = false)
+        assertFalse(uiState.hasNextMessage)
+        assertFalse(uiState.hasPreviousMessage)
+    }
+
+    // Navigation callback tests
+
+    @Test
+    fun `initial onNavigateToNextMessage callback is null`() {
+        assertEquals(null, uiState.onNavigateToNextMessage)
+    }
+
+    @Test
+    fun `initial onNavigateToPreviousMessage callback is null`() {
+        assertEquals(null, uiState.onNavigateToPreviousMessage)
+    }
+
+    @Test
+    fun `navigateToNextMessage invokes callback when hasNextMessage is true`() {
+        var callbackInvoked = false
+        uiState.onNavigateToNextMessage = { callbackInvoked = true }
+        uiState.updateNavigationState(hasNext = true, hasPrevious = false)
+        uiState.navigateToNextMessage()
+        assertTrue(callbackInvoked)
+    }
+
+    @Test
+    fun `navigateToNextMessage does not invoke callback when hasNextMessage is false`() {
+        var callbackInvoked = false
+        uiState.onNavigateToNextMessage = { callbackInvoked = true }
+        uiState.updateNavigationState(hasNext = false, hasPrevious = false)
+        uiState.navigateToNextMessage()
+        assertFalse(callbackInvoked)
+    }
+
+    @Test
+    fun `navigateToPreviousMessage invokes callback when hasPreviousMessage is true`() {
+        var callbackInvoked = false
+        uiState.onNavigateToPreviousMessage = { callbackInvoked = true }
+        uiState.updateNavigationState(hasNext = false, hasPrevious = true)
+        uiState.navigateToPreviousMessage()
+        assertTrue(callbackInvoked)
+    }
+
+    @Test
+    fun `navigateToPreviousMessage does not invoke callback when hasPreviousMessage is false`() {
+        var callbackInvoked = false
+        uiState.onNavigateToPreviousMessage = { callbackInvoked = true }
+        uiState.updateNavigationState(hasNext = false, hasPrevious = false)
+        uiState.navigateToPreviousMessage()
+        assertFalse(callbackInvoked)
+    }
+
+    @Test
+    fun `navigateToNextMessage does nothing when callback is null`() {
+        uiState.onNavigateToNextMessage = null
+        uiState.updateNavigationState(hasNext = true, hasPrevious = false)
+        uiState.navigateToNextMessage() // Should not throw
+    }
+
+    @Test
+    fun `navigateToPreviousMessage does nothing when callback is null`() {
+        uiState.onNavigateToPreviousMessage = null
+        uiState.updateNavigationState(hasNext = false, hasPrevious = true)
+        uiState.navigateToPreviousMessage() // Should not throw
+    }
+
+    @Test
+    fun `navigation callbacks can be invoked multiple times`() {
+        var nextCount = 0
+        var prevCount = 0
+        uiState.onNavigateToNextMessage = { nextCount++ }
+        uiState.onNavigateToPreviousMessage = { prevCount++ }
+        uiState.updateNavigationState(hasNext = true, hasPrevious = true)
+
+        uiState.navigateToNextMessage()
+        uiState.navigateToNextMessage()
+        uiState.navigateToPreviousMessage()
+
+        assertEquals(2, nextCount)
+        assertEquals(1, prevCount)
+    }
+
+    @Test
+    fun `navigation callbacks work independently of other callbacks`() {
+        var nextCalled = false
+        var prevCalled = false
+        var dismissCalled = false
+        var sendCalled = false
+
+        uiState.onNavigateToNextMessage = { nextCalled = true }
+        uiState.onNavigateToPreviousMessage = { prevCalled = true }
+        uiState.onDismissMessage = { dismissCalled = true }
+        uiState.onSendResponse = { sendCalled = true }
+
+        uiState.updateNavigationState(hasNext = true, hasPrevious = false)
+        uiState.navigateToNextMessage()
+
+        assertTrue(nextCalled)
+        assertFalse(prevCalled)
+        assertFalse(dismissCalled)
+        assertFalse(sendCalled)
+    }
 }
