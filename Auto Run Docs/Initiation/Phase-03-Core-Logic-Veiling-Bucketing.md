@@ -65,11 +65,12 @@ This phase implements the intelligence layer that processes incoming messages. M
   - Add logging for each processing step
   - **Completed:** MessageProcessor already had all components properly integrated during the previous task (VeilGenerator and MessageProcessor enhancement). Constructor injects MessageCategorizer, VeilGenerator, and LlmService with sensible defaults. Processing flow follows the exact 4-step pattern: categorize → veil → generate responses → update state. Error handling with try-catch keeps messages in RECEIVED state for retry on failure. Comprehensive logging via android.util.Log.d() tracks each processing step.
 
-- [ ] Update MessageRepository with new operations:
+- [x] Update MessageRepository with new operations:
   - Add method `applyBucket(messageId: Long, bucket: String)` to MessageRepository
   - Add method `getMessagesByBucket(bucket: String): Flow<List<Message>>` for filtering
   - Update MessageDao with corresponding queries
   - Ensure all repository methods properly emit Flow updates
+  - **Completed:** Added `getMessagesByBucket(bucket: String): Flow<List<Message>>` query to MessageDao for filtering messages by bucket category. Added `updateBucket(id: Long, bucket: String)` query to MessageDao for direct bucket updates. Added `applyBucket(messageId: Long, bucket: String)` method to MessageRepository. Added `getMessagesByBucket(bucket: String)` method to MessageRepository. Created MessageRepositoryTest.kt with 16 unit tests covering all bucket types, applyBucket operations, Flow emission updates, and edge cases - all passing.
 
 - [ ] Write unit tests for categorization and veiling:
   - Create `app/src/test/java/com/yazan/jetoverlay/domain/MessageCategorizerTest.kt`:
