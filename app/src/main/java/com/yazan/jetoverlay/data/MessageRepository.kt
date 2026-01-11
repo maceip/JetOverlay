@@ -6,6 +6,12 @@ class MessageRepository(private val messageDao: MessageDao) {
 
     val allMessages: Flow<List<Message>> = messageDao.getAllMessages()
 
+    fun getMessagesByBucket(bucket: String): Flow<List<Message>> = messageDao.getMessagesByBucket(bucket)
+
+    suspend fun applyBucket(messageId: Long, bucket: String) {
+        messageDao.updateBucket(messageId, bucket)
+    }
+
     suspend fun ingestNotification(packageName: String, sender: String, content: String): Long {
         val message = Message(
             packageName = packageName,

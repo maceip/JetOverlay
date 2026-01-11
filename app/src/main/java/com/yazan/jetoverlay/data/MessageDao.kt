@@ -15,6 +15,12 @@ interface MessageDao {
     @Query("SELECT * FROM messages WHERE id = :id")
     suspend fun getMessageById(id: Long): Message?
 
+    @Query("SELECT * FROM messages WHERE bucket = :bucket ORDER BY timestamp DESC")
+    fun getMessagesByBucket(bucket: String): Flow<List<Message>>
+
+    @Query("UPDATE messages SET bucket = :bucket WHERE id = :id")
+    suspend fun updateBucket(id: Long, bucket: String)
+
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insert(message: Message): Long
 
