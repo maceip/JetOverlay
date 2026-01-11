@@ -65,7 +65,7 @@ This phase builds the unified data ingestion pipeline that captures messages fro
   - Add placeholder UI button in `OverlayControlPanel.kt` for "Connect GitHub"
   - **Completed:** Created `GitHubIntegration.kt` as an object/singleton with full OAuth flow stub (`startOAuth`, `handleOAuthCallback`), mock polling with 30-second interval, and message ingestion via `MessageRepository` with `packageName="github"`. Implemented `GitHubNotificationType` enum with PR_REVIEW, PR_COMMENT, ISSUE_COMMENT, MENTION, ASSIGN, CI_FAILURE, and RELEASE types. Created `MockGitHubNotification` data class with id, type, repository, author, title, and content fields. Added "Connect GitHub" button in `OverlayControlPanel.kt` in the Integrations section. Created unit tests in `GitHubIntegrationTest.kt` (12 tests for data class operations, singleton verification, and enum operations). All tests pass.
 
-- [ ] Create unified DataAcquisitionService:
+- [x] Create unified DataAcquisitionService:
   - Create `app/src/main/java/com/yazan/jetoverlay/service/DataAcquisitionService.kt`:
     - Foreground service that coordinates all data sources
     - Manages polling intervals for each integration
@@ -73,8 +73,9 @@ This phase builds the unified data ingestion pipeline that captures messages fro
     - Uses coroutine scope with SupervisorJob for isolation
   - Update `AndroidManifest.xml` to register the service
   - Start this service from `JetOverlayApplication.onCreate()` when permissions are granted
+  - **Completed:** Created `DataAcquisitionService.kt` as a foreground service coordinating all integrations (Slack 15s polling, Email/Notion/GitHub 30s polling). Service uses SupervisorJob for failure isolation between integrations. Added service registration to `AndroidManifest.xml` with `foregroundServiceType="specialUse"` and required permissions (`FOREGROUND_SERVICE`, `FOREGROUND_SERVICE_SPECIAL_USE`). Integrated with `JetOverlayApplication.onCreate()` for automatic startup. Added helper methods `startDataAcquisitionService()` and `stopDataAcquisitionService()`. Created unit tests in `DataAcquisitionServiceTest.kt` (7 tests for IntegrationStatus data class). All tests pass.
 
-- [ ] Write integration tests for data acquisition:
+- [x] Write integration tests for data acquisition:
   - Create `app/src/androidTest/java/com/yazan/jetoverlay/service/NotificationListenerTest.kt`:
     - Test that mock notifications are properly ingested into the database
     - Test that notification cancellation works (may require shell commands)
@@ -82,6 +83,7 @@ This phase builds the unified data ingestion pipeline that captures messages fro
   - Create `app/src/androidTest/java/com/yazan/jetoverlay/service/SmsIntegrationTest.kt`:
     - Test SMS broadcast receiver processes messages correctly
     - Test SMS messages appear in MessageRepository
+  - **Completed:** Created `NotificationListenerTest.kt` with 26 comprehensive tests covering: NotificationConfigManager tests (6 tests for default config, system apps, custom config, removeConfig, helper methods), NotificationFilter tests (4 tests for normal notifications, ongoing notifications, foreground service notifications, NO_CLEAR notifications), NotificationMapper tests (4 tests for valid notifications, missing title/text, special characters), Repository integration tests (4 tests for ingestion, multiple notifications, long content, empty content), End-to-end pipeline tests (5 tests for filter-then-map, filter-then-map-then-ingest, ongoing notification filtering, config-based app settings), and Notification cancellation tests (3 tests for default behavior, system apps, custom config). Uses MockK for StatusBarNotification mocking. The existing `SmsIntegrationTest.kt` (created in SMS ingestion task) already covers: SMS package name validation, receiver instantiation, null context/intent handling, non-SMS intent filtering, SMS intent without PDU handling, SMS message ingestion, SMS vs notification differentiation, and phone number format handling. All tests compile successfully.
 
 - [ ] Run all tests and verify data acquisition works end-to-end:
   - Execute `./gradlew connectedAndroidTest`
