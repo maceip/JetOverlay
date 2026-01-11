@@ -463,15 +463,41 @@ class OverlayUiStateTest {
     }
 
     @Test
+    fun `useEditedResponse sets useEditedResponseFlag to true`() {
+        uiState.startEditing()
+        uiState.updateEditedResponse("Some text")
+        uiState.useEditedResponse()
+        assertTrue(uiState.useEditedResponseFlag)
+    }
+
+    @Test
+    fun `initial useEditedResponseFlag is false`() {
+        assertFalse(uiState.useEditedResponseFlag)
+    }
+
+    @Test
+    fun `selectResponse clears useEditedResponseFlag`() {
+        uiState.startEditing()
+        uiState.updateEditedResponse("Text")
+        uiState.useEditedResponse()
+        assertTrue(uiState.useEditedResponseFlag)
+
+        uiState.selectResponse(0)
+        assertFalse(uiState.useEditedResponseFlag)
+    }
+
+    @Test
     fun `resetResponseSelection clears all response state`() {
         uiState.selectResponse(0)
         uiState.startEditing()
         uiState.updateEditedResponse("Some text")
+        uiState.useEditedResponse()
         uiState.resetResponseSelection()
 
         assertEquals(null, uiState.selectedResponseIndex)
         assertFalse(uiState.isEditing)
         assertEquals("", uiState.editedResponse)
+        assertFalse(uiState.useEditedResponseFlag)
     }
 
     // Callback tests
@@ -550,5 +576,136 @@ class OverlayUiStateTest {
         uiState.isEditing = true
         uiState.editedResponse = "Edited text"
         assertEquals("Edited text", uiState.selectedResponse)
+    }
+
+    // ResponseEditor integration tests
+
+    @Test
+    fun `complete editing workflow from selection to use`() {
+        val messageWithResponses = testMessage.copy(
+            generatedResponses = listOf("hello", "Got it!", "Thanks!")
+        )
+        uiState.updateMessage(messageWithResponses)
+
+        // Step 1: Select a response
+        uiState.selectResponse(1)
+        assertEquals("Got it!", uiState.selectedResponse)
+
+        // Step 2: Start editing (should pre-populate with selected response)
+        uiState.startEditing()
+        assertTrue(uiState.isEditing)
+        assertEquals("Got it!", uiState.editedResponse)
+
+        // Step 3: Modify the response
+        uiState.updateEditedResponse("Got it, I'll handle this!")
+        assertEquals("Got it, I'll handle this!", uiState.editedResponse)
+        assertEquals("Got it, I'll handle this!", uiState.selectedResponse)
+
+        // Step 4: Use the edited response
+        uiState.useEditedResponse()
+        assertFalse(uiState.isEditing)
+        assertTrue(uiState.useEditedResponseFlag) // Flag should be set
+        assertEquals(null, uiState.selectedResponseIndex)
+        // editedResponse is preserved and selectedResponse returns it via useEditedResponseFlag
+        assertEquals("Got it, I'll handle this!", uiState.editedResponse)
+        assertEquals("Got it, I'll handle this!", uiState.selectedResponse)
+    }
+
+    @Test
+    fun `cancel editing returns to previous state`() {
+        val messageWithResponses = testMessage.copy(
+            generatedResponses = listOf("hello", "Got it!")
+        )
+        uiState.updateMessage(messageWithResponses)
+
+        // Select a response and start editing
+        uiState.selectResponse(0)
+        uiState.startEditing()
+        uiState.updateEditedResponse("Modified text")
+
+        // Cancel should clear editing state
+        uiState.cancelEditing()
+        assertFalse(uiState.isEditing)
+        assertEquals("", uiState.editedResponse)
+
+        // Original selection should still be available if we want it
+        // (Note: selectResponse clears editing, but cancelEditing just resets editing state)
+    }
+
+    @Test
+    fun `editing from scratch with no prior selection`() {
+        uiState.startEditing()
+        assertTrue(uiState.isEditing)
+        assertEquals("", uiState.editedResponse)
+
+        uiState.updateEditedResponse("Custom from scratch")
+        assertEquals("Custom from scratch", uiState.selectedResponse)
+        assertTrue(uiState.hasSelectedResponse)
+    }
+
+    @Test
+    fun `hasSelectedResponse is false during editing with empty text`() {
+        uiState.startEditing()
+        uiState.updateEditedResponse("")
+        assertFalse(uiState.hasSelectedResponse)
+    }
+
+    @Test
+    fun `useEditedResponse preserves editedResponse content`() {
+        uiState.startEditing()
+        uiState.updateEditedResponse("My custom response")
+        uiState.useEditedResponse()
+
+        // After useEditedResponse, the editedResponse content should still be accessible
+        // via the useEditedResponseFlag
+        assertEquals("My custom response", uiState.editedResponse)
+        assertEquals("My custom response", uiState.selectedResponse)
+        assertTrue(uiState.hasSelectedResponse)
+    }
+
+    @Test
+    fun `selecting response after editing clears edit state`() {
+        val messageWithResponses = testMessage.copy(
+            generatedResponses = listOf("hello", "Got it!")
+        )
+        uiState.updateMessage(messageWithResponses)
+
+        // Start editing with custom text
+        uiState.startEditing()
+        uiState.updateEditedResponse("Custom text")
+
+        // Selecting a pre-generated response should exit editing mode
+        uiState.selectResponse(0)
+        assertFalse(uiState.isEditing)
+        assertEquals("", uiState.editedResponse)
+        assertEquals("hello", uiState.selectedResponse)
+    }
+
+    @Test
+    fun `send callback receives edited response content`() {
+        var sentResponse: String? = null
+        uiState.onSendResponse = { response -> sentResponse = response }
+
+        uiState.startEditing()
+        uiState.updateEditedResponse("Edited and ready to send")
+        uiState.sendSelectedResponse()
+
+        assertEquals("Edited and ready to send", sentResponse)
+    }
+
+    @Test
+    fun `editing workflow with useEditedResponse then send`() {
+        var sentResponse: String? = null
+        uiState.onSendResponse = { response -> sentResponse = response }
+
+        // Complete workflow: edit, use, then send
+        uiState.startEditing()
+        uiState.updateEditedResponse("Final response text")
+        uiState.useEditedResponse()
+        uiState.sendSelectedResponse()
+
+        // After useEditedResponse, selectedResponse still returns editedResponse
+        // because selectedResponseIndex is null and editedResponse is preserved
+        assertEquals("Final response text", sentResponse)
     }
 }

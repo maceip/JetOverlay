@@ -248,22 +248,45 @@ fun ExpandedMessageView(
             if (uiState.showActions && uiState.message.generatedResponses.isNotEmpty()) {
                 Spacer(modifier = Modifier.height(12.dp))
 
-                // Horizontal scrollable row of response chips
-                ResponseChipsRow(
-                    responses = uiState.message.generatedResponses,
-                    selectedIndex = uiState.selectedResponseIndex,
-                    onResponseSelected = { index -> uiState.selectResponse(index) }
-                )
+                // Show either ResponseEditor (when editing) or ResponseChips (when not editing)
+                AnimatedContent(
+                    targetState = uiState.isEditing,
+                    transitionSpec = {
+                        fadeIn(animationSpec = tween(150)) togetherWith
+                        fadeOut(animationSpec = tween(150))
+                    },
+                    label = "ResponseEditorToggle"
+                ) { isEditing ->
+                    if (isEditing) {
+                        // Show ResponseEditor when in editing mode
+                        ResponseEditor(
+                            currentText = uiState.editedResponse,
+                            onTextChanged = { text -> uiState.updateEditedResponse(text) },
+                            onCancel = { uiState.cancelEditing() },
+                            onUseThis = { uiState.useEditedResponse() }
+                        )
+                    } else {
+                        // Show response chips and action buttons when not editing
+                        Column {
+                            // Horizontal scrollable row of response chips
+                            ResponseChipsRow(
+                                responses = uiState.message.generatedResponses,
+                                selectedIndex = uiState.selectedResponseIndex,
+                                onResponseSelected = { index -> uiState.selectResponse(index) }
+                            )
 
-                Spacer(modifier = Modifier.height(12.dp))
+                            Spacer(modifier = Modifier.height(12.dp))
 
-                // Action buttons row: Edit, Regenerate, Send
-                ActionButtonsRow(
-                    hasSelectedResponse = uiState.hasSelectedResponse,
-                    onEditClick = { uiState.startEditing() },
-                    onRegenerateClick = { uiState.regenerateResponses() },
-                    onSendClick = { uiState.sendSelectedResponse() }
-                )
+                            // Action buttons row: Edit, Regenerate, Send
+                            ActionButtonsRow(
+                                hasSelectedResponse = uiState.hasSelectedResponse,
+                                onEditClick = { uiState.startEditing() },
+                                onRegenerateClick = { uiState.regenerateResponses() },
+                                onSendClick = { uiState.sendSelectedResponse() }
+                            )
+                        }
+                    }
+                }
             }
         }
     }

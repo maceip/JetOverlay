@@ -71,7 +71,7 @@ This phase completes the user-facing experience by enhancing the floating bubble
   - Added 26 new unit tests for response selection, editing, and callback functionality (total 68 tests now)
   - All tests pass successfully
 
-- [ ] Implement response editing flow:
+- [x] Implement response editing flow:
   - Create `app/src/main/java/com/yazan/jetoverlay/ui/ResponseEditor.kt`:
     - Composable with TextField for editing response
     - Pre-populated with selected response or empty for custom
@@ -80,6 +80,17 @@ This phase completes the user-facing experience by enhancing the floating bubble
   - Integrate into FloatingBubble:
     - Tapping "Edit" shows ResponseEditor in place of response chips
     - "Use This" sets the edited text as selectedResponse
+
+  **Completed:** Implemented `ResponseEditor.kt` composable and integrated into `FloatingBubble.kt`:
+  - Created `ResponseEditor` composable with TextField pre-populated with selected response
+  - Added `AnimatedResponseEditor` wrapper for enter/exit animations
+  - Keyboard auto-shows via `FocusRequester` and `LocalSoftwareKeyboardController`
+  - "Cancel" button calls `cancelEditing()` and hides keyboard
+  - "Use This" button (enabled only when text is not blank) calls `useEditedResponse()`
+  - Integrated into `ExpandedMessageView` with `AnimatedContent` to smoothly switch between ResponseEditor and ResponseChipsRow
+  - Fixed state management bug: added `useEditedResponseFlag` to `OverlayUiState.kt` to preserve edited response after "Use This" is clicked
+  - Added 11 new unit tests for editing workflow including flag behavior (total 79 tests now)
+  - All tests pass successfully
 
 - [ ] Implement send/dismiss flow:
   - Create `app/src/main/java/com/yazan/jetoverlay/domain/ResponseSender.kt`:

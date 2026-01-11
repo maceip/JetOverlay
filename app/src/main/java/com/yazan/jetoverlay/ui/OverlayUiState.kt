@@ -109,10 +109,18 @@ class OverlayUiState(
             .keys
             .sortedBy { it.ordinal }
 
+    // Flag indicating if edited response should be used (set by useEditedResponse)
+    var useEditedResponseFlag by mutableStateOf(false)
+        private set
+
     // Get the currently selected response text
     val selectedResponse: String?
         get() = when {
+            // When actively editing, use current edit text
             isEditing && editedResponse.isNotBlank() -> editedResponse
+            // When user clicked "Use This", use the preserved edited response
+            useEditedResponseFlag && editedResponse.isNotBlank() -> editedResponse
+            // Otherwise use selected index from response chips
             selectedResponseIndex != null && selectedResponseIndex!! < message.generatedResponses.size ->
                 message.generatedResponses[selectedResponseIndex!!]
             else -> null
@@ -128,6 +136,7 @@ class OverlayUiState(
         if (index != null) {
             isEditing = false
             editedResponse = ""
+            useEditedResponseFlag = false
         }
     }
 
@@ -150,6 +159,7 @@ class OverlayUiState(
         // Clear selected index to use edited response instead
         selectedResponseIndex = null
         isEditing = false
+        useEditedResponseFlag = true
     }
 
     fun regenerateResponses() {
@@ -166,5 +176,6 @@ class OverlayUiState(
         selectedResponseIndex = null
         isEditing = false
         editedResponse = ""
+        useEditedResponseFlag = false
     }
 }
