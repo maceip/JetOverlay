@@ -1,11 +1,11 @@
 package com.yazan.jetoverlay.service.integration
 
 import android.content.Context
-import android.content.Intent
 import android.net.Uri
 import android.util.Log
 import androidx.browser.customtabs.CustomTabsIntent
 import com.yazan.jetoverlay.data.MessageRepository
+import com.yazan.jetoverlay.data.SlackConfig
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
@@ -14,6 +14,8 @@ import okhttp3.FormBody
 import okhttp3.OkHttpClient
 import okhttp3.Request
 import org.json.JSONObject
+import java.io.IOException
+import java.util.concurrent.TimeUnit
 
 object SlackIntegration {
 
@@ -21,16 +23,24 @@ object SlackIntegration {
     private const val CLIENT_SECRET = "YOUR_SLACK_CLIENT_SECRET" // TODO: Replace
     private const val REDIRECT_URI = "jetoverlay://slack-callback"
     private const val TAG = "SlackIntegration"
+    const val SLACK_PACKAGE_NAME = "com.slack"
 
-    private val client = OkHttpClient()
-    private var accessToken: String? = null
+    private val client = OkHttpClient.Builder()
+        .connectTimeout(30, TimeUnit.SECONDS)
+        .readTimeout(30, TimeUnit.SECONDS)
+        .writeTimeout(30, TimeUnit.SECONDS)
+        .build()
 
     // For Demo: In-memory running flag
     private var isPolling = false
 
+    // Track consecutive failures for backoff
+    private var consecutiveFailures = 0
+
     fun startOAuth(context: Context) {
+        Log.d(TAG, "Starting Slack OAuth flow")
         val url = "https://slack.com/oauth/v2/authorize?client_id=$CLIENT_ID&scope=channels:history,groups:history,im:history,mpim:history&user_scope=&redirect_uri=$REDIRECT_URI"
-        
+
         val intent = CustomTabsIntent.Builder().build()
         intent.launchUrl(context, Uri.parse(url))
     }
@@ -38,19 +48,23 @@ object SlackIntegration {
     suspend fun handleCallback(uri: Uri, repository: MessageRepository): Boolean {
         val code = uri.getQueryParameter("code")
         if (code != null) {
-            Log.d(TAG, "Received code: $code. Exchanging for token...")
+            Log.d(TAG, "Received authorization code: ${code.take(10)}...")
             return exchangeCodeForToken(code, repository)
         } else {
             val error = uri.getQueryParameter("error")
+            val errorDescription = uri.getQueryParameter("error_description")
             Log.e(TAG, "OAuth Error: $error")
+            Log.e(TAG, "OAuth Error Description: $errorDescription")
+            Log.e(TAG, "Full callback URI: $uri")
             return false
         }
     }
 
     private suspend fun exchangeCodeForToken(code: String, repository: MessageRepository): Boolean {
-        // Exchange code for token
         return kotlinx.coroutines.withContext(Dispatchers.IO) {
             try {
+                Log.d(TAG, "Exchanging authorization code for access token...")
+
                 val formBody = FormBody.Builder()
                     .add("client_id", CLIENT_ID)
                     .add("client_secret", CLIENT_SECRET)
@@ -69,62 +83,183 @@ object SlackIntegration {
                 if (response.isSuccessful && responseBody != null) {
                     val json = JSONObject(responseBody)
                     if (json.optBoolean("ok")) {
-                        accessToken = json.optString("authed_user_access_token") 
-                        // Note: Depending on 'token_rotation' or bot tokens, might be 'access_token'
+                        // Extract access token (try authed_user first, then access_token)
+                        var accessToken = json.optString("authed_user_access_token")
                         if (accessToken.isNullOrEmpty()) {
-                             accessToken = json.optString("access_token")
+                            accessToken = json.optString("access_token")
                         }
-                        
-                        Log.d(TAG, "Token received: ${accessToken?.take(5)}...")
+
+                        if (accessToken.isNullOrEmpty()) {
+                            Log.e(TAG, "OAuth token exchange succeeded but no token found in response")
+                            Log.e(TAG, "Response keys: ${json.keys().asSequence().toList()}")
+                            return@withContext false
+                        }
+
+                        // Save the token
+                        SlackConfig.saveTokens(accessToken)
+                        Log.d(TAG, "Access token saved: ${accessToken.take(10)}...")
+
+                        // Extract and save workspace info if available
+                        val team = json.optJSONObject("team")
+                        if (team != null) {
+                            val workspaceId = team.optString("id", "")
+                            val workspaceName = team.optString("name", "")
+                            val userId = json.optJSONObject("authed_user")?.optString("id", "") ?: ""
+
+                            if (workspaceId.isNotEmpty()) {
+                                SlackConfig.saveWorkspaceInfo(workspaceId, workspaceName, userId)
+                                Log.d(TAG, "Workspace info saved: $workspaceName")
+                            }
+                        }
+
                         startPolling(repository)
                         return@withContext true
                     } else {
-                        Log.e(TAG, "Slack Error: ${json.optString("error")}")
+                        val errorMsg = json.optString("error", "unknown")
+                        val errorDetail = json.optString("error_description", "")
+                        Log.e(TAG, "Slack API Error during token exchange: $errorMsg")
+                        if (errorDetail.isNotEmpty()) {
+                            Log.e(TAG, "Error detail: $errorDetail")
+                        }
+                        Log.e(TAG, "Full error response: $responseBody")
                     }
                 } else {
-                    Log.e(TAG, "Network Error: ${response.code}")
+                    Log.e(TAG, "HTTP Error during token exchange: ${response.code}")
+                    Log.e(TAG, "Response message: ${response.message}")
+                    if (responseBody != null) {
+                        Log.e(TAG, "Response body: $responseBody")
+                    }
                 }
+            } catch (e: IOException) {
+                Log.e(TAG, "Network error during token exchange", e)
             } catch (e: Exception) {
-                e.printStackTrace()
+                Log.e(TAG, "Unexpected error during token exchange", e)
             }
             return@withContext false
         }
     }
 
     fun startPolling(repository: MessageRepository) {
-        if (isPolling) return
+        if (isPolling) {
+            Log.d(TAG, "Polling already active")
+            return
+        }
+
+        val accessToken = SlackConfig.getAccessToken()
+        if (accessToken.isNullOrEmpty()) {
+            Log.w(TAG, "Cannot start polling - no access token available")
+            return
+        }
+
         isPolling = true
-        
+        consecutiveFailures = 0
+
+        Log.d(TAG, "Starting Slack polling (interval: ${SlackConfig.DEFAULT_POLL_INTERVAL_MS}ms)")
+
         CoroutineScope(Dispatchers.IO).launch {
-            Log.d(TAG, "Starting aggressive polling...")
-            while (isPolling && accessToken != null) {
-                fetchMessages(repository)
-                delay(5000) // Poll every 5 seconds (Aggressive enough for demo?) 
-                // Real "aggressive" might be 1s but that hits rate limits fast.
+            while (isPolling) {
+                val success = fetchMessages(repository)
+
+                if (success) {
+                    // Reset backoff on success
+                    SlackConfig.resetBackoff()
+                    consecutiveFailures = 0
+                    delay(SlackConfig.DEFAULT_POLL_INTERVAL_MS) // 15 seconds
+                } else {
+                    // Apply exponential backoff on failure
+                    consecutiveFailures++
+                    val backoffDelay = SlackConfig.recordFailureAndGetBackoff()
+                    Log.w(TAG, "Polling failed (consecutive: $consecutiveFailures). Backing off for ${backoffDelay}ms")
+                    delay(backoffDelay)
+                }
             }
         }
     }
 
-    private fun fetchMessages(repository: MessageRepository) {
-        // Mock implementation for "conversations.history" 
+    fun stopPolling() {
+        Log.d(TAG, "Stopping Slack polling")
+        isPolling = false
+    }
+
+    /**
+     * Fetches messages from Slack API.
+     * Uses last poll timestamp to avoid duplicate messages.
+     *
+     * @return true if fetch was successful, false on error
+     */
+    private fun fetchMessages(repository: MessageRepository): Boolean {
+        // Mock implementation for "conversations.history"
         // In a real app we need to know WHICH channel to poll or list all channels first.
-        // For the sake of this prompt's constraints ("generic... aggressively get every single message"), 
-        // we'll assume we iterate channels or just hit 'conversations.list' then 'history'.
-        
+
         // Simulating a fetch for the demo if creds aren't real yet
         if (CLIENT_ID == "YOUR_SLACK_CLIENT_ID") {
-            // Fake ingestion for demo
-           /* 
-            repository.ingestNotification(
-                packageName = "com.slack",
-                sender = "SlackUser",
-                content = "Polled message at ${System.currentTimeMillis()}"
-            )
-            */
-            return
+            // Update last poll timestamp even for mock data
+            SlackConfig.saveLastPollTimestamp(System.currentTimeMillis())
+            Log.d(TAG, "Using mock mode - no real API calls")
+            return true
         }
-        
-        // TODO: Real Implementation using 'conversations.list' and 'conversations.history'
-        // This requires 'channels:read' scope as well.
+
+        val accessToken = SlackConfig.getAccessToken()
+        if (accessToken.isNullOrEmpty()) {
+            Log.e(TAG, "No access token available for fetching messages")
+            return false
+        }
+
+        try {
+            // Get the oldest timestamp from last successful poll
+            val lastPollTimestamp = SlackConfig.getLastPollTimestampForApi()
+            Log.d(TAG, "Fetching messages newer than: $lastPollTimestamp")
+
+            // TODO: Real Implementation using 'conversations.list' and 'conversations.history'
+            // This requires 'channels:read' scope as well.
+            // Example:
+            // 1. GET https://slack.com/api/conversations.list to get channel IDs
+            // 2. For each channel, GET https://slack.com/api/conversations.history?channel=CHANNEL_ID&oldest=$lastPollTimestamp
+            // 3. Parse messages and ingest via repository
+
+            // For now, mark as successful and update timestamp
+            SlackConfig.saveLastPollTimestamp(System.currentTimeMillis())
+            return true
+
+        } catch (e: IOException) {
+            Log.e(TAG, "Network error fetching Slack messages", e)
+            return false
+        } catch (e: Exception) {
+            Log.e(TAG, "Error fetching Slack messages", e)
+            return false
+        }
+    }
+
+    /**
+     * Checks if the integration is currently connected (has valid tokens).
+     */
+    fun isConnected(): Boolean {
+        return SlackConfig.hasValidTokens()
+    }
+
+    /**
+     * Checks if polling is currently active.
+     */
+    fun isPollingActive(): Boolean {
+        return isPolling
+    }
+
+    /**
+     * Disconnects the Slack integration by clearing stored tokens.
+     */
+    fun disconnect() {
+        Log.d(TAG, "Disconnecting Slack integration")
+        stopPolling()
+        SlackConfig.clearAll()
+    }
+
+    /**
+     * Gets debug information about the current state.
+     */
+    fun getDebugInfo(): Map<String, String> {
+        return SlackConfig.getDebugInfo() + mapOf(
+            "isPolling" to isPolling.toString(),
+            "consecutiveFailures" to consecutiveFailures.toString()
+        )
     }
 }

@@ -37,7 +37,7 @@ This phase builds the unified data ingestion pipeline that captures messages fro
   - Add placeholder UI button in `OverlayControlPanel.kt` for "Connect Email"
   - **Completed:** Created `EmailIntegration.kt` as an object/singleton with full OAuth flow stub (`startOAuth`, `handleOAuthCallback`), mock polling with 30-second interval, and message ingestion via `MessageRepository` with `packageName="email"`. Created `EmailConfig.kt` for persisting OAuth tokens (access_token, refresh_token, expiry_time) to SharedPreferences with token validation and expiry checking (5-minute buffer). Added "Connect Email" button in `OverlayControlPanel.kt` in the Integrations section. Created unit tests in `EmailIntegrationTest.kt` (7 tests for MockEmail data class and constants) and instrumented tests in `EmailConfigTest.kt` (14 tests for token storage/retrieval). All tests pass.
 
-- [ ] Enhance Slack integration with proper error handling:
+- [x] Enhance Slack integration with proper error handling:
   - Read existing `app/src/main/java/com/yazan/jetoverlay/service/integration/SlackIntegration.kt`
   - Add exponential backoff on API failures (start at 5s, max 60s)
   - Add proper error logging for OAuth failures
@@ -45,6 +45,7 @@ This phase builds the unified data ingestion pipeline that captures messages fro
   - Create `app/src/main/java/com/yazan/jetoverlay/data/SlackConfig.kt`:
     - Persist workspace info and last poll timestamp
   - Reduce polling frequency to 15 seconds for production use
+  - **Completed:** Created `SlackConfig.kt` with full configuration persistence including OAuth tokens (access_token, bot_token), workspace info (workspace_id, workspace_name, user_id), last poll timestamp for duplicate detection, and exponential backoff state (current_backoff, last_error_timestamp). Enhanced `SlackIntegration.kt` with exponential backoff (5s initial, 60s max, 2x multiplier), comprehensive OAuth error logging (error codes, descriptions, full response bodies), last poll timestamp integration using Slack API format, and 15-second polling interval (via `SlackConfig.DEFAULT_POLL_INTERVAL_MS`). Created unit tests in `SlackConfigTest.kt` (7 tests for constants and backoff math) and `SlackIntegrationTest.kt` (2 tests for constants and singleton). Created instrumented tests in `data/SlackConfigTest.kt` (26 tests covering token storage, workspace info, poll timestamps, exponential backoff, and debug info). All tests pass.
 
 - [ ] Create Notion integration stub:
   - Create `app/src/main/java/com/yazan/jetoverlay/service/integration/NotionIntegration.kt`:
