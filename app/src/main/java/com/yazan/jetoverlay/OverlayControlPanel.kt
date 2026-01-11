@@ -30,6 +30,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.Call
 import androidx.compose.material.icons.filled.Notifications
 import androidx.compose.material.icons.rounded.Add
 import androidx.compose.material3.Card
@@ -118,15 +119,33 @@ fun OverlayControlPanel(modifier: Modifier = Modifier) {
         onPauseOrDispose { }
     }
 
+    // --- AUTO-SHOW ON LAUNCH ---
+    // If we have permissions, just show the agent bubble immediately so the user sees something.
+    LaunchedEffect(hasOverlayPermission, hasNotificationPermission) {
+         if (hasOverlayPermission && hasNotificationPermission) {
+             if (!OverlaySdk.isOverlayActive("agent_bubble")) {
+                 OverlaySdk.show(
+                     context = context,
+                     config = OverlayConfig(
+                         id = "agent_bubble",
+                         type = "overlay_1", 
+                         initialX = 100,
+                         initialY = 300
+                     )
+                 )
+             }
+         }
+    }
+
     Column(modifier = modifier.fillMaxSize().padding(16.dp)) {
         Text(
-            text = "JetOverlay Manager",
+            text = "Overlay Agent",
             style = MaterialTheme.typography.headlineMedium,
             fontWeight = FontWeight.Bold,
             color = MaterialTheme.colorScheme.primary
         )
         Text(
-            text = "Select a shape to pin to your screen.",
+            text = "Background Intelligence Service",
             style = MaterialTheme.typography.bodyMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant
         )
@@ -149,7 +168,7 @@ fun OverlayControlPanel(modifier: Modifier = Modifier) {
                 }
             }
 
-            // Priority 2: Notification Permission (Android 13+)
+            // Priority 3: Runtime Permissions (Audio/Phone)
             !hasNotificationPermission -> {
                 PermissionWarningCard(
                     title = "Notifications Required",
@@ -162,122 +181,160 @@ fun OverlayControlPanel(modifier: Modifier = Modifier) {
                 }
             }
 
-            // Priority 3: Show Grid
-            else -> {
-                LazyVerticalGrid(
-                    columns = GridCells.Fixed(2),
-                    horizontalArrangement = Arrangement.spacedBy(12.dp),
-                    verticalArrangement = Arrangement.spacedBy(12.dp)
+            // Priority 3: Notification Listener Access (Read/Reply)
+            !Settings.Secure.getString(context.contentResolver, "enabled_notification_listeners").orEmpty().contains(context.packageName) -> {
+                PermissionWarningCard(
+                    title = "Read/Reply Access Required",
+                    text = "Tap to grant Notification Access for intelligence",
+                    icon = Icons.Default.Notifications
                 ) {
-                    items(options) { option ->
-                        val isActive = activeOverlays.containsKey(option.id)
-                        OverlayOptionCard(
-                            option = option,
-                            isActive = isActive,
-                            onClick = {
-                                if (isActive) {
-                                    OverlaySdk.hide(option.id)
-                                } else {
-                                    OverlaySdk.show(
-                                        context = context,
-                                        config = OverlayConfig(
-                                            id = option.id,
-                                            initialX = 100,
-                                            initialY = 300
-                                        ),
-                                        payload = option.color.value.toLong()
-                                    )
-                                }
-                            }
-                        )
-                    }
+                    val intent = Intent(Settings.ACTION_NOTIFICATION_LISTENER_SETTINGS)
+                    context.startActivity(intent)
                 }
             }
-        }
-    }
-}
 
-@Composable
-fun OverlayOptionCard(
-    option: OverlayOption,
-    isActive: Boolean,
-    onClick: () -> Unit
-) {
-    val scale by animateFloatAsState(
-        targetValue = if (isActive) 0.95f else 1f,
-        label = "scale"
-    )
-    val alpha by animateFloatAsState(
-        targetValue = if (isActive) 0.6f else 1f,
-        label = "alpha"
-    )
-
-    Card(
-        modifier = Modifier
-            .fillMaxWidth()
-            .height(120.dp)
-            .scale(scale)
-            .clickable { onClick() },
-        shape = RoundedCornerShape(16.dp),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
-        elevation = CardDefaults.cardElevation(defaultElevation = if (isActive) 0.dp else 4.dp)
-    ) {
-        Box(modifier = Modifier.fillMaxSize()) {
-            Box(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .background(
-                        Brush.verticalGradient(
-                            listOf(option.color.copy(alpha = 0.2f), Color.Transparent)
-                        )
-                    )
-            )
-
-            Column(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .padding(16.dp),
-                verticalArrangement = Arrangement.SpaceBetween
-            ) {
-                Box(
-                    modifier = Modifier
-                        .size(40.dp)
-                        .clip(RoundedCornerShape(8.dp))
-                        .background(option.color)
-                        .shadow(4.dp, RoundedCornerShape(8.dp))
+            // Priority 4: Runtime Permissions (Audio & Phone)
+            context.checkSelfPermission(Manifest.permission.RECORD_AUDIO) != PackageManager.PERMISSION_GRANTED ||
+            context.checkSelfPermission(Manifest.permission.ANSWER_PHONE_CALLS) != PackageManager.PERMISSION_GRANTED ||
+            context.checkSelfPermission(Manifest.permission.READ_PHONE_STATE) != PackageManager.PERMISSION_GRANTED -> {
+                
+                val multiplePermissionsLauncher = rememberLauncherForActivityResult(
+                    contract = ActivityResultContracts.RequestMultiplePermissions(),
+                    onResult = { 
+                        // Refresh will handle
+                    }
                 )
 
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
+                PermissionWarningCard(
+                    title = "Permissions Required",
+                    text = "Allow Audio & Phone access for Agent features",
+                    icon = Icons.Default.Call
                 ) {
-                    Text(
-                        text = option.name,
-                        style = MaterialTheme.typography.titleSmall,
-                        fontWeight = FontWeight.SemiBold,
-                        color = MaterialTheme.colorScheme.onSurface.copy(alpha = alpha)
+                    multiplePermissionsLauncher.launch(
+                        arrayOf(
+                            Manifest.permission.RECORD_AUDIO,
+                            Manifest.permission.ANSWER_PHONE_CALLS,
+                            Manifest.permission.READ_PHONE_STATE,
+                            Manifest.permission.READ_CONTACTS
+                        )
                     )
+                }
+            }
 
-                    AnimatedVisibility(visible = isActive) {
-                        Icon(
-                            imageVector = Icons.Default.Close,
-                            contentDescription = "Remove",
-                            tint = MaterialTheme.colorScheme.error
-                        )
+            // Priority 3: Call Screening Role (Android 10+)
+            Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q && 
+            !context.getSystemService(android.app.role.RoleManager::class.java).isRoleHeld(android.app.role.RoleManager.ROLE_CALL_SCREENING) -> {
+                val roleLauncher = rememberLauncherForActivityResult(
+                    contract = ActivityResultContracts.StartActivityForResult(),
+                    onResult = { 
+                        // Refresh UI will handle state change
+                        android.util.Log.d("OverlayControlPanel", "Role request result: $it")
                     }
-                    AnimatedVisibility(visible = !isActive) {
-                        Icon(
-                            imageVector = Icons.Rounded.Add,
-                            contentDescription = "Add",
-                            tint = MaterialTheme.colorScheme.primary
-                        )
+                )
+                
+                PermissionWarningCard(
+                    title = "Call Screening Required",
+                    text = "Tap to set as Default Call Screening App",
+                    icon = Icons.Default.Call
+                ) {
+                   try {
+                       android.util.Log.d("OverlayControlPanel", "Requesting Call Screening Role")
+                       val roleManager = context.getSystemService(android.app.role.RoleManager::class.java)
+                       val intent = roleManager.createRequestRoleIntent(android.app.role.RoleManager.ROLE_CALL_SCREENING)
+                       roleLauncher.launch(intent)
+                   } catch (e: Exception) {
+                       android.util.Log.e("OverlayControlPanel", "Failed to request role", e)
+                       // Fallback to settings
+                       val intent = Intent(Settings.ACTION_MANAGE_DEFAULT_APPS_SETTINGS)
+                       context.startActivity(intent)
+                   }
+                }
+            }
+
+            // Priority 3: Active Status
+            else -> {
+                Card(
+                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
+                    modifier = Modifier.fillMaxWidth().height(200.dp),
+                    shape = RoundedCornerShape(16.dp)
+                ) {
+                    Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                            Icon(
+                                imageVector = Icons.Default.Notifications,
+                                contentDescription = null,
+                                tint = MaterialTheme.colorScheme.primary,
+                                modifier = Modifier.size(48.dp)
+                            )
+                            Spacer(modifier = Modifier.height(16.dp))
+                            Text(
+                                text = "Agent is Listening",
+                                style = MaterialTheme.typography.titleLarge,
+                                fontWeight = FontWeight.Bold
+                            )
+                            Spacer(modifier = Modifier.height(8.dp))
+                            Text(
+                                text = "Waiting for new messages...",
+                                style = MaterialTheme.typography.bodyMedium
+                            )
+                        }
                     }
+                }
+                
+                // Integrations Section
+                Spacer(modifier = Modifier.height(24.dp))
+                Text(
+                    text = "Integrations",
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.primary
+                )
+                Spacer(modifier = Modifier.height(8.dp))
+                
+                Card(
+                    modifier = Modifier.fillMaxWidth(),
+                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
+                ) {
+                    Column(modifier = Modifier.padding(16.dp)) {
+                        androidx.compose.material3.Button(
+                            onClick = {
+                                com.yazan.jetoverlay.service.integration.SlackIntegration.startOAuth(context)
+                            },
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Text("Connect Slack")
+                        }
+                    }
+                }
+                
+                Spacer(modifier = Modifier.height(24.dp))
+                
+                // Debug Button
+                androidx.compose.material3.Button(
+                    onClick = {
+                        // Manually trigger the agent bubble for testing
+                        if (!OverlaySdk.isOverlayActive("agent_bubble")) {
+                            OverlaySdk.show(
+                                context = context,
+                                config = OverlayConfig(
+                                    id = "agent_bubble",
+                                    type = "overlay_1", 
+                                    initialX = 100,
+                                    initialY = 300
+                                )
+                            )
+                        }
+                    },
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Text("Test: Spawn Agent Bubble")
                 }
             }
         }
     }
 }
+// Removed OverlayOptionCard
+
 
 @Composable
 fun PermissionWarningCard(
