@@ -4,12 +4,14 @@ import androidx.compose.animation.*
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.spring
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ChatBubble
+import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -20,9 +22,12 @@ import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import com.yazan.jetoverlay.api.OverlaySdk
 import com.yazan.jetoverlay.data.Message
+import com.yazan.jetoverlay.domain.MessageBucket
 
 @Composable
 fun FloatingBubble(
@@ -52,7 +57,11 @@ fun FloatingBubble(
                 )
             } else {
                 CollapsedBubbleView(
-                    onClick = { uiState.isExpanded = true }
+                    onClick = { uiState.isExpanded = true },
+                    isProcessing = uiState.isProcessing,
+                    isProcessingComplete = uiState.isProcessingComplete,
+                    pendingCount = uiState.pendingMessageCount,
+                    bucket = uiState.currentBucket
                 )
             }
         }
@@ -60,26 +69,90 @@ fun FloatingBubble(
 }
 
 @Composable
-fun CollapsedBubbleView(onClick: () -> Unit) {
+fun CollapsedBubbleView(
+    onClick: () -> Unit,
+    isProcessing: Boolean = false,
+    isProcessingComplete: Boolean = false,
+    pendingCount: Int = 0,
+    bucket: MessageBucket = MessageBucket.UNKNOWN
+) {
+    // Get the bucket color for border accent
+    val bucketColor = Color(bucket.color)
+
     Box(
-        modifier = Modifier
-            .size(60.dp) // Much smaller as requested
-            .shadow(8.dp, CircleShape)
-            .clip(CircleShape)
-            .background(
-                Brush.linearGradient(
-                    listOf(Color(0xFF6200EE), Color(0xFF3700B3))
-                )
-            )
-            .clickable { onClick() },
+        modifier = Modifier.size(68.dp), // Slightly larger to accommodate border
         contentAlignment = Alignment.Center
     ) {
-        Icon(
-            imageVector = Icons.Default.ChatBubble,
-            contentDescription = "Open Chat",
-            tint = Color.White,
-            modifier = Modifier.size(28.dp)
-        )
+        // Main bubble with bucket-colored border
+        Box(
+            modifier = Modifier
+                .size(60.dp)
+                .shadow(8.dp, CircleShape)
+                .clip(CircleShape)
+                .border(
+                    width = 3.dp,
+                    color = bucketColor,
+                    shape = CircleShape
+                )
+                .background(
+                    Brush.linearGradient(
+                        listOf(Color(0xFF6200EE), Color(0xFF3700B3))
+                    )
+                )
+                .clickable { onClick() },
+            contentAlignment = Alignment.Center
+        ) {
+            // Show different content based on processing state
+            when {
+                isProcessing -> {
+                    // Show spinner when processing
+                    CircularProgressIndicator(
+                        modifier = Modifier.size(16.dp),
+                        color = Color.White,
+                        strokeWidth = 2.dp
+                    )
+                }
+                isProcessingComplete -> {
+                    // Show checkmark when complete
+                    Icon(
+                        imageVector = Icons.Default.Check,
+                        contentDescription = "Processing Complete",
+                        tint = Color.White,
+                        modifier = Modifier.size(28.dp)
+                    )
+                }
+                else -> {
+                    // Default chat bubble icon
+                    Icon(
+                        imageVector = Icons.Default.ChatBubble,
+                        contentDescription = "Open Chat",
+                        tint = Color.White,
+                        modifier = Modifier.size(28.dp)
+                    )
+                }
+            }
+        }
+
+        // Pending message count badge (top-right)
+        if (pendingCount > 0) {
+            Box(
+                modifier = Modifier
+                    .align(Alignment.TopEnd)
+                    .size(22.dp)
+                    .shadow(2.dp, CircleShape)
+                    .clip(CircleShape)
+                    .background(Color(0xFFE53935)), // Red badge
+                contentAlignment = Alignment.Center
+            ) {
+                Text(
+                    text = if (pendingCount > 99) "99+" else pendingCount.toString(),
+                    color = Color.White,
+                    fontSize = if (pendingCount > 99) 8.sp else 11.sp,
+                    fontWeight = FontWeight.Bold,
+                    textAlign = TextAlign.Center
+                )
+            }
+        }
     }
 }
 

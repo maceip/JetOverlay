@@ -4,7 +4,7 @@ This phase completes the user-facing experience by enhancing the floating bubble
 
 ## Tasks
 
-- [ ] Add visual status indicators to FloatingBubble:
+- [x] Add visual status indicators to FloatingBubble:
   - Read existing `app/src/main/java/com/yazan/jetoverlay/ui/FloatingBubble.kt`
   - Add processing state indicator:
     - Small animated spinner when message is being processed
@@ -16,6 +16,14 @@ This phase completes the user-facing experience by enhancing the floating bubble
   - Add bucket color coding:
     - Tint the bubble border/accent based on bucket color from MessageBucket
     - URGENT: red, WORK: blue, SOCIAL: green, PROMOTIONAL: gray
+
+  **Completed:** Added `ProcessingState` enum and visual indicators to `FloatingBubble.kt`:
+  - Processing spinner (16dp `CircularProgressIndicator`) shown when `isProcessing` is true
+  - Checkmark icon when processing is complete
+  - Red badge with white text positioned top-right showing pending message count (handles 99+ overflow)
+  - Bucket-colored 3dp border around bubble using `MessageBucket.color`
+  - Updated `OverlayUiState.kt` with `processingState`, `pendingMessageCount`, and `currentBucket` properties
+  - Created `OverlayUiStateTest.kt` with 29 unit tests covering all new functionality
 
 - [ ] Implement bucket-based message queue UI:
   - Update `app/src/main/java/com/yazan/jetoverlay/ui/AgentOverlay.kt`:
