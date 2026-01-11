@@ -87,7 +87,7 @@ This phase establishes the foundation for confident development by auditing the 
     - Updated `app/build.gradle.kts` with all test dependencies
     - Build verified successful with `./gradlew :app:compileDebugAndroidTestKotlin`
 
-- [ ] Create Room database tests:
+- [x] Create Room database tests:
   - Create `app/src/androidTest/java/com/yazan/jetoverlay/data/MessageDaoTest.kt`:
     - Test insert and retrieve messages
     - Test Flow emissions on data changes
@@ -95,6 +95,16 @@ This phase establishes the foundation for confident development by auditing the 
     - Test update and delete operations
   - Use in-memory Room database for test isolation
   - Verify type converters work correctly for List<String> serialization
+  - **Completed 2026-01-11**: Created comprehensive MessageDaoTest with 19 test cases covering:
+    - Insert/retrieve operations (single message, multiple messages, by ID, non-existent ID)
+    - Flow emissions (initial empty, on insert, on update, on deleteAll) using Turbine
+    - Ordering verification (timestamp DESC)
+    - Update operations (modifying fields, preserving unmodified fields)
+    - Delete operations (deleteAll, empty table handling)
+    - Type converters for List<String> (empty list, single item, multiple items, special characters including Unicode/emoji, updates)
+    - REPLACE conflict strategy behavior for insert with existing ID
+    - Uses in-memory Room database for test isolation, Turbine for Flow testing
+    - Fixed META-INF packaging conflicts in build.gradle.kts by excluding LICENSE.md and LICENSE-notice.md for JUnit Jupiter dependencies
 
 - [ ] Create overlay lifecycle integration tests:
   - Create `app/src/androidTest/java/com/yazan/jetoverlay/service/OverlayServiceTest.kt`:
