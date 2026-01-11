@@ -11,6 +11,7 @@ import com.yazan.jetoverlay.api.OverlaySdk
 import com.yazan.jetoverlay.data.AppDatabase
 import com.yazan.jetoverlay.data.Message
 import com.yazan.jetoverlay.data.MessageRepository
+import com.yazan.jetoverlay.service.DataAcquisitionService
 import com.yazan.jetoverlay.ui.FloatingBubble
 import com.yazan.jetoverlay.ui.OverlayUiState
 import kotlinx.coroutines.MainScope
@@ -58,11 +59,33 @@ class JetOverlayApplication : Application() {
                 // keeping it simple for now, focusing on the agent bubble.
                 }
             }
+
+            // Start the Data Acquisition Service for polling integrations
+            // Note: The service will only start polling for integrations that have valid tokens
+            startDataAcquisitionService()
+
             android.util.Log.d("JetOverlayDebug", "JetOverlayApplication: onCreate completed successfully")
         } catch (e: Throwable) {
             android.util.Log.e("JetOverlayCrash", "CRITICAL: Application onCreate failed", e)
             throw e
         }
+    }
+
+    /**
+     * Starts the Data Acquisition Service to coordinate polling for all integrations.
+     * Safe to call multiple times - the service will only start once.
+     */
+    fun startDataAcquisitionService() {
+        android.util.Log.d("JetOverlayDebug", "JetOverlayApplication: Starting DataAcquisitionService")
+        DataAcquisitionService.start(this)
+    }
+
+    /**
+     * Stops the Data Acquisition Service.
+     */
+    fun stopDataAcquisitionService() {
+        android.util.Log.d("JetOverlayDebug", "JetOverlayApplication: Stopping DataAcquisitionService")
+        DataAcquisitionService.stop(this)
     }
 
     override fun onTerminate() {
