@@ -4,7 +4,7 @@ This phase implements the intelligence layer that processes incoming messages. M
 
 ## Tasks
 
-- [ ] Create message bucketing/categorization system:
+- [x] Create message bucketing/categorization system:
   - Create `app/src/main/java/com/yazan/jetoverlay/domain/MessageBucket.kt`:
     - Enum class with buckets: URGENT, WORK, SOCIAL, PROMOTIONAL, TRANSACTIONAL, UNKNOWN
     - Each bucket has display name and color for UI
@@ -18,6 +18,7 @@ This phase implements the intelligence layer that processes incoming messages. M
       - TRANSACTIONAL: OTPs, receipts, shipping updates
       - UNKNOWN: default fallback
   - Update `Message.kt` entity to add `bucket: String` field (Room migration needed)
+  - **Completed:** Created MessageBucket enum with 6 buckets, each with displayName and color. Created MessageCategorizer with heuristic-based categorization. Added `bucket: String = "UNKNOWN"` field to Message entity. Created 51 unit tests in MessageCategorizerTest.kt and MessageBucketTest.kt - all passing.
 
 - [ ] Implement Room database migration for new fields:
   - Update `app/src/main/java/com/yazan/jetoverlay/data/AppDatabase.kt`:

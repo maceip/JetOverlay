@@ -18,6 +18,7 @@ data class Message(
     val generatedResponses: List<String> = emptyList(),
     val selectedResponse: String? = null,
     val status: String = "RECEIVED",
+    val bucket: String = "UNKNOWN",
     val timestamp: Long = System.currentTimeMillis()
 )
 
