@@ -17,6 +17,9 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ChatBubble
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.automirrored.filled.Send
+import androidx.compose.material.icons.filled.Edit
+import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -167,7 +170,7 @@ fun ExpandedMessageView(
 ) {
     Card(
         modifier = Modifier
-            .width(300.dp) // Fixed width for message view
+            .width(320.dp) // Slightly wider for action buttons
             .wrapContentHeight(),
         shape = RoundedCornerShape(16.dp),
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
@@ -204,7 +207,7 @@ fun ExpandedMessageView(
 
             Spacer(modifier = Modifier.height(8.dp))
 
-            // Veiled/Unveiled Content with smooth transition
+            // Veiled/Unveiled Content with smooth transition (tappable to reveal)
             AnimatedContent(
                 targetState = uiState.message.id,
                 transitionSpec = {
@@ -221,28 +224,198 @@ fun ExpandedMessageView(
                         .clickable { uiState.toggleReveal() }
                         .padding(12.dp)
                 ) {
-                    Text(
-                        text = uiState.displayContent,
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = if (uiState.isRevealed) MaterialTheme.colorScheme.onSurface
-                                else MaterialTheme.colorScheme.onSurfaceVariant
-                    )
+                    Column {
+                        // "Tap to reveal" hint when veiled
+                        if (!uiState.isRevealed) {
+                            Text(
+                                text = "Tap to reveal",
+                                style = MaterialTheme.typography.labelSmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f)
+                            )
+                            Spacer(modifier = Modifier.height(4.dp))
+                        }
+                        Text(
+                            text = uiState.displayContent,
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = if (uiState.isRevealed) MaterialTheme.colorScheme.onSurface
+                                    else MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
                 }
             }
 
-            // Actions (Chips)
-            if (uiState.showActions) {
-                Spacer(modifier = Modifier.height(16.dp))
-                uiState.message.generatedResponses.forEach { response ->
-                    SuggestionChip(
-                        onClick = {
-                            // TODO: Send Action
-                        },
-                        label = { Text(response) },
-                        modifier = Modifier.fillMaxWidth()
-                    )
-                }
+            // Response chips and actions (only show when revealed and expanded)
+            if (uiState.showActions && uiState.message.generatedResponses.isNotEmpty()) {
+                Spacer(modifier = Modifier.height(12.dp))
+
+                // Horizontal scrollable row of response chips
+                ResponseChipsRow(
+                    responses = uiState.message.generatedResponses,
+                    selectedIndex = uiState.selectedResponseIndex,
+                    onResponseSelected = { index -> uiState.selectResponse(index) }
+                )
+
+                Spacer(modifier = Modifier.height(12.dp))
+
+                // Action buttons row: Edit, Regenerate, Send
+                ActionButtonsRow(
+                    hasSelectedResponse = uiState.hasSelectedResponse,
+                    onEditClick = { uiState.startEditing() },
+                    onRegenerateClick = { uiState.regenerateResponses() },
+                    onSendClick = { uiState.sendSelectedResponse() }
+                )
             }
+        }
+    }
+}
+
+/**
+ * Horizontal scrollable row of response chips.
+ * Each chip is tappable to select that response.
+ */
+@Composable
+fun ResponseChipsRow(
+    responses: List<String>,
+    selectedIndex: Int?,
+    onResponseSelected: (Int) -> Unit
+) {
+    val scrollState = rememberScrollState()
+
+    Column {
+        Text(
+            text = "Suggested responses:",
+            style = MaterialTheme.typography.labelMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
+        Spacer(modifier = Modifier.height(6.dp))
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .horizontalScroll(scrollState),
+            horizontalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            responses.forEachIndexed { index, response ->
+                ResponseChip(
+                    response = response,
+                    isSelected = selectedIndex == index,
+                    onClick = { onResponseSelected(index) }
+                )
+            }
+        }
+    }
+}
+
+/**
+ * Individual response chip with selection highlight.
+ */
+@Composable
+fun ResponseChip(
+    response: String,
+    isSelected: Boolean,
+    onClick: () -> Unit
+) {
+    val primaryColor = MaterialTheme.colorScheme.primary
+    val backgroundColor = if (isSelected) primaryColor.copy(alpha = 0.15f) else Color.Transparent
+    val borderColor = if (isSelected) primaryColor else MaterialTheme.colorScheme.outline.copy(alpha = 0.5f)
+    val textColor = if (isSelected) primaryColor else MaterialTheme.colorScheme.onSurface
+
+    // Animate selection state
+    val animatedBorderWidth by animateFloatAsState(
+        targetValue = if (isSelected) 2f else 1f,
+        animationSpec = tween(150),
+        label = "chipBorder"
+    )
+
+    Box(
+        modifier = Modifier
+            .clip(RoundedCornerShape(20.dp))
+            .border(animatedBorderWidth.dp, borderColor, RoundedCornerShape(20.dp))
+            .background(backgroundColor)
+            .clickable { onClick() }
+            .padding(horizontal = 14.dp, vertical = 8.dp)
+    ) {
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(6.dp)
+        ) {
+            // Show checkmark when selected
+            if (isSelected) {
+                Icon(
+                    imageVector = Icons.Default.Check,
+                    contentDescription = "Selected",
+                    tint = primaryColor,
+                    modifier = Modifier.size(14.dp)
+                )
+            }
+            Text(
+                text = response,
+                style = MaterialTheme.typography.bodyMedium,
+                color = textColor,
+                fontWeight = if (isSelected) FontWeight.SemiBold else FontWeight.Normal,
+                maxLines = 1
+            )
+        }
+    }
+}
+
+/**
+ * Row of action buttons: Edit, Regenerate, Send.
+ */
+@Composable
+fun ActionButtonsRow(
+    hasSelectedResponse: Boolean,
+    onEditClick: () -> Unit,
+    onRegenerateClick: () -> Unit,
+    onSendClick: () -> Unit
+) {
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.spacedBy(8.dp)
+    ) {
+        // Edit button
+        OutlinedButton(
+            onClick = onEditClick,
+            modifier = Modifier.weight(1f),
+            contentPadding = PaddingValues(horizontal = 8.dp, vertical = 6.dp)
+        ) {
+            Icon(
+                imageVector = Icons.Default.Edit,
+                contentDescription = null,
+                modifier = Modifier.size(16.dp)
+            )
+            Spacer(modifier = Modifier.width(4.dp))
+            Text("Edit", style = MaterialTheme.typography.labelMedium)
+        }
+
+        // Regenerate button
+        OutlinedButton(
+            onClick = onRegenerateClick,
+            modifier = Modifier.weight(1f),
+            contentPadding = PaddingValues(horizontal = 8.dp, vertical = 6.dp)
+        ) {
+            Icon(
+                imageVector = Icons.Default.Refresh,
+                contentDescription = null,
+                modifier = Modifier.size(16.dp)
+            )
+            Spacer(modifier = Modifier.width(4.dp))
+            Text("Regenerate", style = MaterialTheme.typography.labelSmall)
+        }
+
+        // Send button (enabled only when response is selected)
+        Button(
+            onClick = onSendClick,
+            enabled = hasSelectedResponse,
+            modifier = Modifier.weight(1f),
+            contentPadding = PaddingValues(horizontal = 8.dp, vertical = 6.dp)
+        ) {
+            Icon(
+                imageVector = Icons.AutoMirrored.Filled.Send,
+                contentDescription = null,
+                modifier = Modifier.size(16.dp)
+            )
+            Spacer(modifier = Modifier.width(4.dp))
+            Text("Send", style = MaterialTheme.typography.labelMedium)
         }
     }
 }

@@ -317,4 +317,238 @@ class OverlayUiStateTest {
         assertEquals(3, uiState.pendingMessageCount)
         assertEquals(secondCounts, uiState.pendingCounts)
     }
+
+    // Response selection tests
+
+    @Test
+    fun `initial selectedResponseIndex is null`() {
+        assertEquals(null, uiState.selectedResponseIndex)
+    }
+
+    @Test
+    fun `selectResponse sets selectedResponseIndex correctly`() {
+        uiState.selectResponse(0)
+        assertEquals(0, uiState.selectedResponseIndex)
+    }
+
+    @Test
+    fun `selectResponse with null clears selection`() {
+        uiState.selectResponse(0)
+        uiState.selectResponse(null)
+        assertEquals(null, uiState.selectedResponseIndex)
+    }
+
+    @Test
+    fun `selectResponse exits editing mode`() {
+        uiState.startEditing()
+        uiState.selectResponse(0)
+        assertFalse(uiState.isEditing)
+        assertEquals("", uiState.editedResponse)
+    }
+
+    @Test
+    fun `selectedResponse returns response at selectedIndex`() {
+        val messageWithResponses = testMessage.copy(
+            generatedResponses = listOf("hello", "Got it!", "Thanks!")
+        )
+        uiState.updateMessage(messageWithResponses)
+        uiState.selectResponse(1)
+        assertEquals("Got it!", uiState.selectedResponse)
+    }
+
+    @Test
+    fun `selectedResponse returns null when no selection`() {
+        assertEquals(null, uiState.selectedResponse)
+    }
+
+    @Test
+    fun `selectedResponse returns editedResponse when editing with content`() {
+        uiState.isEditing = true
+        uiState.editedResponse = "Custom response"
+        assertEquals("Custom response", uiState.selectedResponse)
+    }
+
+    @Test
+    fun `hasSelectedResponse is false when no response selected`() {
+        assertFalse(uiState.hasSelectedResponse)
+    }
+
+    @Test
+    fun `hasSelectedResponse is true when response is selected`() {
+        val messageWithResponses = testMessage.copy(
+            generatedResponses = listOf("hello", "Got it!")
+        )
+        uiState.updateMessage(messageWithResponses)
+        uiState.selectResponse(0)
+        assertTrue(uiState.hasSelectedResponse)
+    }
+
+    @Test
+    fun `hasSelectedResponse is true when editing with content`() {
+        uiState.isEditing = true
+        uiState.editedResponse = "Custom"
+        assertTrue(uiState.hasSelectedResponse)
+    }
+
+    // Editing mode tests
+
+    @Test
+    fun `initial isEditing is false`() {
+        assertFalse(uiState.isEditing)
+    }
+
+    @Test
+    fun `initial editedResponse is empty`() {
+        assertEquals("", uiState.editedResponse)
+    }
+
+    @Test
+    fun `startEditing sets isEditing to true`() {
+        uiState.startEditing()
+        assertTrue(uiState.isEditing)
+    }
+
+    @Test
+    fun `startEditing pre-populates with selected response`() {
+        val messageWithResponses = testMessage.copy(
+            generatedResponses = listOf("hello", "Got it!")
+        )
+        uiState.updateMessage(messageWithResponses)
+        uiState.selectResponse(1)
+        uiState.startEditing()
+        assertEquals("Got it!", uiState.editedResponse)
+    }
+
+    @Test
+    fun `startEditing with no selection leaves editedResponse empty`() {
+        uiState.startEditing()
+        assertEquals("", uiState.editedResponse)
+    }
+
+    @Test
+    fun `cancelEditing sets isEditing to false`() {
+        uiState.startEditing()
+        uiState.cancelEditing()
+        assertFalse(uiState.isEditing)
+    }
+
+    @Test
+    fun `cancelEditing clears editedResponse`() {
+        uiState.startEditing()
+        uiState.updateEditedResponse("Some text")
+        uiState.cancelEditing()
+        assertEquals("", uiState.editedResponse)
+    }
+
+    @Test
+    fun `updateEditedResponse updates editedResponse`() {
+        uiState.updateEditedResponse("New response text")
+        assertEquals("New response text", uiState.editedResponse)
+    }
+
+    @Test
+    fun `useEditedResponse clears selectedResponseIndex`() {
+        uiState.selectResponse(0)
+        uiState.startEditing()
+        uiState.updateEditedResponse("Edited text")
+        uiState.useEditedResponse()
+        assertEquals(null, uiState.selectedResponseIndex)
+    }
+
+    @Test
+    fun `useEditedResponse sets isEditing to false`() {
+        uiState.startEditing()
+        uiState.useEditedResponse()
+        assertFalse(uiState.isEditing)
+    }
+
+    @Test
+    fun `resetResponseSelection clears all response state`() {
+        uiState.selectResponse(0)
+        uiState.startEditing()
+        uiState.updateEditedResponse("Some text")
+        uiState.resetResponseSelection()
+
+        assertEquals(null, uiState.selectedResponseIndex)
+        assertFalse(uiState.isEditing)
+        assertEquals("", uiState.editedResponse)
+    }
+
+    // Callback tests
+
+    @Test
+    fun `regenerateResponses invokes callback`() {
+        var callbackInvoked = false
+        uiState.onRegenerateResponses = { callbackInvoked = true }
+        uiState.regenerateResponses()
+        assertTrue(callbackInvoked)
+    }
+
+    @Test
+    fun `regenerateResponses does nothing when callback is null`() {
+        uiState.onRegenerateResponses = null
+        uiState.regenerateResponses() // Should not throw
+    }
+
+    @Test
+    fun `sendSelectedResponse invokes callback with response`() {
+        var sentResponse: String? = null
+        val messageWithResponses = testMessage.copy(
+            generatedResponses = listOf("hello", "Got it!")
+        )
+        uiState.updateMessage(messageWithResponses)
+        uiState.selectResponse(1)
+        uiState.onSendResponse = { response -> sentResponse = response }
+        uiState.sendSelectedResponse()
+        assertEquals("Got it!", sentResponse)
+    }
+
+    @Test
+    fun `sendSelectedResponse does nothing when no response selected`() {
+        var callbackInvoked = false
+        uiState.onSendResponse = { callbackInvoked = true }
+        uiState.sendSelectedResponse()
+        assertFalse(callbackInvoked)
+    }
+
+    @Test
+    fun `sendSelectedResponse sends edited response when editing`() {
+        var sentResponse: String? = null
+        uiState.isEditing = true
+        uiState.editedResponse = "Custom edited response"
+        uiState.onSendResponse = { response -> sentResponse = response }
+        uiState.sendSelectedResponse()
+        assertEquals("Custom edited response", sentResponse)
+    }
+
+    // Edge case tests
+
+    @Test
+    fun `selectedResponse returns null for out of bounds index`() {
+        val messageWithResponses = testMessage.copy(
+            generatedResponses = listOf("hello")
+        )
+        uiState.updateMessage(messageWithResponses)
+        uiState.selectedResponseIndex = 5 // Out of bounds
+        assertEquals(null, uiState.selectedResponse)
+    }
+
+    @Test
+    fun `editing with blank response returns null for selectedResponse`() {
+        uiState.isEditing = true
+        uiState.editedResponse = "   " // Blank
+        assertEquals(null, uiState.selectedResponse)
+    }
+
+    @Test
+    fun `editing takes priority over selected index for selectedResponse`() {
+        val messageWithResponses = testMessage.copy(
+            generatedResponses = listOf("hello", "Got it!")
+        )
+        uiState.updateMessage(messageWithResponses)
+        uiState.selectResponse(0)
+        uiState.isEditing = true
+        uiState.editedResponse = "Edited text"
+        assertEquals("Edited text", uiState.selectedResponse)
+    }
 }

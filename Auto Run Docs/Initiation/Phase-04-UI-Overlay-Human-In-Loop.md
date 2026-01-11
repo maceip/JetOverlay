@@ -46,7 +46,7 @@ This phase completes the user-facing experience by enhancing the floating bubble
   - Added 13 new unit tests for bucket filtering functionality (total 42 tests now)
   - All tests pass successfully
 
-- [ ] Enhance expanded card with response actions:
+- [x] Enhance expanded card with response actions:
   - Update FloatingBubble expanded state to show:
     - Veiled content at top (tappable to reveal)
     - Horizontal scrollable row of generated response chips
@@ -55,6 +55,21 @@ This phase completes the user-facing experience by enhancing the floating bubble
   - Add "Edit" button that opens text input for custom response
   - Add "Regenerate" button to request new AI responses (calls StubLlmService again)
   - Add "Send" button that queues the selected/edited response
+
+  **Completed:** Enhanced `ExpandedMessageView` in `FloatingBubble.kt` with full response actions:
+  - Added "Tap to reveal" hint for veiled content with tappable reveal
+  - Created `ResponseChipsRow` composable with horizontal scrollable response chips
+  - Created `ResponseChip` composable with selection animation (checkmark, highlighted border, primary color)
+  - Created `ActionButtonsRow` composable with Edit, Regenerate, and Send buttons
+  - Send button is disabled until a response is selected
+  - Updated `OverlayUiState.kt` with:
+    - `selectedResponseIndex`, `isEditing`, `editedResponse` state properties
+    - `selectedResponse` derived property handling both chip selection and custom edits
+    - `hasSelectedResponse` property for button enable/disable logic
+    - Methods: `selectResponse()`, `startEditing()`, `cancelEditing()`, `updateEditedResponse()`, `useEditedResponse()`, `regenerateResponses()`, `sendSelectedResponse()`, `resetResponseSelection()`
+    - Callback hooks: `onRegenerateResponses` and `onSendResponse`
+  - Added 26 new unit tests for response selection, editing, and callback functionality (total 68 tests now)
+  - All tests pass successfully
 
 - [ ] Implement response editing flow:
   - Create `app/src/main/java/com/yazan/jetoverlay/ui/ResponseEditor.kt`:

@@ -40,6 +40,19 @@ class OverlayUiState(
     // Pending counts per bucket for badge display
     var pendingCounts: Map<MessageBucket, Int> by mutableStateOf(emptyMap())
 
+    // Response selection state
+    var selectedResponseIndex: Int? by mutableStateOf(null)
+
+    // Editing mode state
+    var isEditing by mutableStateOf(false)
+
+    // Custom edited response text (when editing)
+    var editedResponse by mutableStateOf("")
+
+    // Callbacks for actions (set by the overlay controller)
+    var onRegenerateResponses: (() -> Unit)? = null
+    var onSendResponse: ((String) -> Unit)? = null
+
     // Derived states
     val displayContent: String
         get() = if (isRevealed) message.originalContent else (message.veiledContent ?: "New Message")
@@ -95,4 +108,63 @@ class OverlayUiState(
         get() = pendingCounts.filter { it.value > 0 }
             .keys
             .sortedBy { it.ordinal }
+
+    // Get the currently selected response text
+    val selectedResponse: String?
+        get() = when {
+            isEditing && editedResponse.isNotBlank() -> editedResponse
+            selectedResponseIndex != null && selectedResponseIndex!! < message.generatedResponses.size ->
+                message.generatedResponses[selectedResponseIndex!!]
+            else -> null
+        }
+
+    // Check if a valid response is selected or edited
+    val hasSelectedResponse: Boolean
+        get() = selectedResponse != null
+
+    fun selectResponse(index: Int?) {
+        selectedResponseIndex = index
+        // Exit editing mode when selecting a pre-generated response
+        if (index != null) {
+            isEditing = false
+            editedResponse = ""
+        }
+    }
+
+    fun startEditing() {
+        isEditing = true
+        // Pre-populate with selected response if available
+        editedResponse = selectedResponse ?: ""
+    }
+
+    fun cancelEditing() {
+        isEditing = false
+        editedResponse = ""
+    }
+
+    fun updateEditedResponse(text: String) {
+        editedResponse = text
+    }
+
+    fun useEditedResponse() {
+        // Clear selected index to use edited response instead
+        selectedResponseIndex = null
+        isEditing = false
+    }
+
+    fun regenerateResponses() {
+        onRegenerateResponses?.invoke()
+    }
+
+    fun sendSelectedResponse() {
+        selectedResponse?.let { response ->
+            onSendResponse?.invoke(response)
+        }
+    }
+
+    fun resetResponseSelection() {
+        selectedResponseIndex = null
+        isEditing = false
+        editedResponse = ""
+    }
 }
