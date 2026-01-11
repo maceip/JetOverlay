@@ -53,7 +53,7 @@ This phase implements the intelligence layer that processes incoming messages. M
   - Wire StubLlmService into MessageProcessor for response generation
   - **Completed:** Created LlmService interface with `suspend fun generateResponses(message: Message, bucket: MessageBucket): List<String>`. Created StubLlmService implementation with 500ms delay and logging. Updated MessageProcessor to inject and use LlmService (defaults to StubLlmService). Added testOptions.unitTests.isReturnDefaultValues=true to build.gradle.kts to enable Android mocking in unit tests. Created 19 unit tests in StubLlmServiceTest.kt verifying: expected responses, consistency across buckets, delay application, interface compliance, and edge cases - all passing.
 
-- [ ] Update MessageProcessor to use new components:
+- [x] Update MessageProcessor to use new components:
   - Modify `app/src/main/java/com/yazan/jetoverlay/domain/MessageProcessor.kt`:
     - Inject MessageCategorizer, VeilGenerator, and LlmService (via constructor)
     - Update processing flow:
@@ -63,6 +63,7 @@ This phase implements the intelligence layer that processes incoming messages. M
       4. Update status to PROCESSED
   - Ensure proper error handling if any step fails
   - Add logging for each processing step
+  - **Completed:** MessageProcessor already had all components properly integrated during the previous task (VeilGenerator and MessageProcessor enhancement). Constructor injects MessageCategorizer, VeilGenerator, and LlmService with sensible defaults. Processing flow follows the exact 4-step pattern: categorize → veil → generate responses → update state. Error handling with try-catch keeps messages in RECEIVED state for retry on failure. Comprehensive logging via android.util.Log.d() tracks each processing step.
 
 - [ ] Update MessageRepository with new operations:
   - Add method `applyBucket(messageId: Long, bucket: String)` to MessageRepository
