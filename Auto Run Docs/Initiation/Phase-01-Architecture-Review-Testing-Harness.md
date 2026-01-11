@@ -40,7 +40,7 @@ This phase establishes the foundation for confident development by auditing the 
     - type: analysis, tags: [architecture, room, data-layer]
   - **Completed 2026-01-11**: Created comprehensive data layer audit identifying 13 issues: malformed JSON handling in TypeConverters (MEDIUM), unbounded ReplyActionCache growth (MEDIUM), silent failures in repository operations (MEDIUM), no migration strategy, status field stringly-typed, Gson instance recreation, no pagination. Flow emissions verified thread-safe via Room's automatic IO dispatcher and Compose's collectAsState. Room database correctly configured for v1.
 
-- [ ] Audit MessageProcessor (Brain) and notification handling:
+- [x] Audit MessageProcessor (Brain) and notification handling:
   - Read `app/src/main/java/com/yazan/jetoverlay/domain/MessageProcessor.kt`
   - Read `app/src/main/java/com/yazan/jetoverlay/service/notification/NotificationFilter.kt`
   - Read `app/src/main/java/com/yazan/jetoverlay/service/notification/NotificationMapper.kt`
@@ -49,6 +49,7 @@ This phase establishes the foundation for confident development by auditing the 
   - Verify SupervisorJob usage and exception propagation
   - Document findings in `docs/architecture/brain-audit.md` with front matter:
     - type: analysis, tags: [architecture, message-processing, coroutines]
+  - **Completed 2026-01-11**: Created comprehensive audit identifying 11 issues: no coroutine cancellation in MessageProcessor (HIGH), duplicate processing risk due to Flow re-emission (HIGH), silent exception handling with SupervisorJob (MEDIUM), service scope not cancelled (MEDIUM), missing EXTRA_BIG_TEXT handling in NotificationMapper (MEDIUM). SupervisorJob usage is correct but incomplete - needs CoroutineExceptionHandler. NotificationFilter is intentionally permissive for debugging. Recommended adding stop() method to MessageProcessor and cancelling scopes in onDestroy().
 
 - [ ] Create architecture summary with fragility matrix:
   - Create `docs/architecture/fragility-matrix.md` consolidating all audit findings
