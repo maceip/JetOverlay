@@ -106,13 +106,22 @@ This phase establishes the foundation for confident development by auditing the 
     - Uses in-memory Room database for test isolation, Turbine for Flow testing
     - Fixed META-INF packaging conflicts in build.gradle.kts by excluding LICENSE.md and LICENSE-notice.md for JUnit Jupiter dependencies
 
-- [ ] Create overlay lifecycle integration tests:
+- [x] Create overlay lifecycle integration tests:
   - Create `app/src/androidTest/java/com/yazan/jetoverlay/service/OverlayServiceTest.kt`:
     - Test service starts correctly as foreground service
     - Test overlay appears when OverlaySdk.show() is called
     - Test overlay disappears when OverlaySdk.hide() is called
     - Test service survives configuration changes
   - These tests validate the core overlay mechanism works end-to-end
+  - **Completed 2026-01-11**: Created comprehensive OverlayServiceTest with 10 test cases covering:
+    - Service lifecycle: starts as foreground service when overlay shown, stops when no active overlays
+    - Overlay SDK integration: show() makes overlay active, hide() makes overlay inactive
+    - Multiple overlays: supports concurrent overlays, hiding one does not affect others
+    - Configuration changes: survives orientation change, survives app backgrounding
+    - Edge cases: handles duplicate show() calls gracefully, handles hide() for non-existent overlay, handles rapid show/hide cycles
+    - Uses BaseAndroidTest for common setup, TestUtils for wait conditions
+    - Requires SYSTEM_ALERT_WINDOW permission (granted via ADB shell in setUp)
+    - Build verified successful with ./gradlew :app:compileDebugAndroidTestKotlin
 
 - [ ] Run all tests and verify green state:
   - Execute `./gradlew connectedAndroidTest` on the emulator
