@@ -4,7 +4,7 @@ This phase establishes the foundation for confident development by auditing the 
 
 ## Tasks
 
-- [ ] Audit overlay lifecycle and Android 16 compatibility:
+- [x] Audit overlay lifecycle and Android 16 compatibility:
   - Read `jetoverlay/src/main/java/com/yazan/jetoverlay/service/OverlayService.kt` thoroughly
   - Read `jetoverlay/src/main/java/com/yazan/jetoverlay/internal/OverlayViewWrapper.kt` thoroughly
   - Analyze WindowManager lifecycle handling (attach/detach, configuration changes)
@@ -14,6 +14,7 @@ This phase establishes the foundation for confident development by auditing the 
   - Document findings in `docs/architecture/overlay-lifecycle-audit.md` with front matter:
     - type: analysis, tags: [architecture, android-16, overlay, lifecycle]
   - List any fragility points or recommended fixes
+  - **Completed 2026-01-11**: Created comprehensive audit document identifying 6 fragility points including race condition in onDestroy, silent exception swallowing, and potential memory leak in registry. Android 16 compatibility verified - FOREGROUND_SERVICE_TYPE_SPECIAL_USE handling is correct.
 
 - [ ] Audit Hilt/DI setup and service architecture:
   - Read `app/src/main/java/com/yazan/jetoverlay/JetOverlayApplication.kt`
