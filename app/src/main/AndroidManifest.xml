@@ -51,6 +51,16 @@
                 <action android:name="android.service.callscreening.CallScreeningService" />
             </intent-filter>
         </service>
+
+        <!-- SMS Broadcast Receiver -->
+        <receiver
+            android:name="com.yazan.jetoverlay.service.integration.SmsIntegration"
+            android:exported="true"
+            android:permission="android.permission.BROADCAST_SMS">
+            <intent-filter android:priority="999">
+                <action android:name="android.provider.Telephony.SMS_RECEIVED" />
+            </intent-filter>
+        </receiver>
     </application>
 
     <uses-permission android:name="android.permission.INTERNET" />
@@ -60,5 +70,7 @@
     <uses-permission android:name="android.permission.READ_CONTACTS" />
     <uses-permission android:name="android.permission.MANAGE_OWN_CALLS" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MICROPHONE" />
+    <uses-permission android:name="android.permission.RECEIVE_SMS" />
+    <uses-permission android:name="android.permission.READ_SMS" />
 
 </manifest>

@@ -14,7 +14,7 @@ This phase builds the unified data ingestion pipeline that captures messages fro
   - Test that notifications are properly intercepted and hidden on the emulator
   - **Completed:** Created `NotificationConfig.kt` with `NotificationConfigManager` for per-app configuration. Enhanced `AppNotificationListenerService.kt` to check config and call `cancelNotification(sbn.key)` after processing. Added unit tests in `NotificationConfigTest.kt`. System apps (android, systemui, downloads) are protected from cancellation.
 
-- [ ] Create SMS ingestion service:
+- [x] Create SMS ingestion service:
   - Create `app/src/main/java/com/yazan/jetoverlay/service/integration/SmsIntegration.kt`:
     - BroadcastReceiver for `android.provider.Telephony.SMS_RECEIVED`
     - Extract sender number and message body from PDU
@@ -23,6 +23,7 @@ This phase builds the unified data ingestion pipeline that captures messages fro
   - Update `AndroidManifest.xml` to register the receiver with proper intent filter
   - Add `RECEIVE_SMS` and `READ_SMS` permissions to manifest
   - Handle the permission request flow in `OverlayControlPanel.kt`
+  - **Completed:** Created `SmsIntegration.kt` as a BroadcastReceiver that handles `SMS_RECEIVED_ACTION` intents, extracts sender and message body using `Telephony.Sms.Intents.getMessagesFromIntent()`, supports multi-part SMS concatenation, and ingests messages via `MessageRepository` with `packageName="sms"`. Added SMS permissions (`RECEIVE_SMS`, `READ_SMS`) and receiver registration in `AndroidManifest.xml`. Added SMS permission request flow in `OverlayControlPanel.kt` after Call Screening role check. Created unit tests in `SmsIntegrationTest.kt` and instrumented tests in `service/SmsIntegrationTest.kt`.
 
 - [ ] Create email ingestion foundation (Gmail API stub):
   - Create `app/src/main/java/com/yazan/jetoverlay/service/integration/EmailIntegration.kt`:

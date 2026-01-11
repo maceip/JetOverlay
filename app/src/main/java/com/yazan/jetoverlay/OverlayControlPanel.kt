@@ -31,6 +31,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Call
+import androidx.compose.material.icons.filled.Email
 import androidx.compose.material.icons.filled.Notifications
 import androidx.compose.material.icons.rounded.Add
 import androidx.compose.material3.Card
@@ -222,16 +223,16 @@ fun OverlayControlPanel(modifier: Modifier = Modifier) {
             }
 
             // Priority 3: Call Screening Role (Android 10+)
-            Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q && 
+            Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q &&
             !context.getSystemService(android.app.role.RoleManager::class.java).isRoleHeld(android.app.role.RoleManager.ROLE_CALL_SCREENING) -> {
                 val roleLauncher = rememberLauncherForActivityResult(
                     contract = ActivityResultContracts.StartActivityForResult(),
-                    onResult = { 
+                    onResult = {
                         // Refresh UI will handle state change
                         android.util.Log.d("OverlayControlPanel", "Role request result: $it")
                     }
                 )
-                
+
                 PermissionWarningCard(
                     title = "Call Screening Required",
                     text = "Tap to set as Default Call Screening App",
@@ -251,7 +252,31 @@ fun OverlayControlPanel(modifier: Modifier = Modifier) {
                 }
             }
 
-            // Priority 3: Active Status
+            // Priority 5: SMS Permissions
+            context.checkSelfPermission(Manifest.permission.RECEIVE_SMS) != PackageManager.PERMISSION_GRANTED ||
+            context.checkSelfPermission(Manifest.permission.READ_SMS) != PackageManager.PERMISSION_GRANTED -> {
+                val smsPermissionsLauncher = rememberLauncherForActivityResult(
+                    contract = ActivityResultContracts.RequestMultiplePermissions(),
+                    onResult = {
+                        // Refresh will handle
+                    }
+                )
+
+                PermissionWarningCard(
+                    title = "SMS Permissions Required",
+                    text = "Allow SMS access to intercept text messages",
+                    icon = Icons.Default.Email
+                ) {
+                    smsPermissionsLauncher.launch(
+                        arrayOf(
+                            Manifest.permission.RECEIVE_SMS,
+                            Manifest.permission.READ_SMS
+                        )
+                    )
+                }
+            }
+
+            // Priority 6: Active Status
             else -> {
                 Card(
                     colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
