@@ -46,34 +46,8 @@ class JetOverlayApplication : Application() {
 
             // Register default agent overlay content (overlay_1)
             OverlaySdk.registerContent("overlay_1") { payload ->
-                android.util.Log.d("JetOverlayDebug", "OverlayContent: Composing overlay_1")
-                
-                // Note: In a real app, you might want to inject the repository or scope differently.
-                val messages by repository.allMessages.collectAsState(initial = emptyList())
-                android.util.Log.d("JetOverlayDebug", "OverlayContent: Messages count: ${messages.size}")
-
-                val activeMessage = messages.lastOrNull { it.status != "SENT" && it.status != "DISMISSED" }
-                android.util.Log.d("JetOverlayDebug", "OverlayContent: Active message found: ${activeMessage?.id}")
-
-                if (activeMessage != null) {
-                    android.util.Log.d("JetOverlayDebug", "OverlayContent: Rendering Active Bubble")
-                    val uiState = remember(activeMessage.id) { OverlayUiState(activeMessage) }
-                    LaunchedEffect(activeMessage) {
-                        uiState.updateMessage(activeMessage)
-                    }
-                    FloatingBubble(modifier = Modifier, uiState = uiState)
-                } else {
-                    android.util.Log.d("JetOverlayDebug", "OverlayContent: Rendering Idle Bubble")
-                    val idleMessage = Message(
-                        packageName = "",
-                        senderName = "System",
-                        originalContent = "No new notifications. The agent is listening.",
-                        status = "IDLE",
-                        veiledContent = "Agent Active"
-                    )
-                    val uiState = remember { OverlayUiState(idleMessage) }
-                    FloatingBubble(modifier = Modifier, uiState = uiState)
-                }
+                android.util.Log.d("JetOverlayDebug", "OverlayContent: Composing AgentOverlay")
+                com.yazan.jetoverlay.ui.AgentOverlay(repository = repository)
             }
             
             // Also register the demo options if needed, or keep them for the UI control panel only.
