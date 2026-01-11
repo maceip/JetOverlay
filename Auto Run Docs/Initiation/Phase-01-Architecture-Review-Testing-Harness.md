@@ -69,7 +69,7 @@ This phase establishes the foundation for confident development by auditing the 
   - Include front matter: type: reference, tags: [testing, emulator, setup]
   - **Completed 2026-01-11**: Verified Android SDK installed at `%LOCALAPPDATA%\Android\Sdk` with emulator, platforms (API 34-36), and system images. Existing AVD `Medium_Phone_API_36.1` (x86_64, Google Play) is configured and ready. Created comprehensive `docs/testing/emulator-setup.md` with launch commands, troubleshooting guide, and CI integration notes. Note: ANDROID_HOME environment variable is not set - documented as recommendation.
 
-- [ ] Create E2E test infrastructure for the app module:
+- [x] Create E2E test infrastructure for the app module:
   - Create `app/src/androidTest/java/com/yazan/jetoverlay/BaseAndroidTest.kt`:
     - Base test class with common setup/teardown
     - ActivityScenario utilities for MainActivity
@@ -79,6 +79,13 @@ This phase establishes the foundation for confident development by auditing the 
     - Helper for simulating notification posts (if possible via instrumentation)
     - Timeout constants and retry logic
   - Update `app/build.gradle.kts` if needed to add test dependencies (MockK, Turbine for Flow testing)
+  - **Completed 2026-01-11**: Created comprehensive E2E test infrastructure including:
+    - `BaseAndroidTest.kt`: Base test class with ActivityScenario utilities, overlay permission helpers (via ADB shell), wait condition helpers, UiDevice access, and emulator detection
+    - `TestConstants.kt`: Timeout constants, test message data, and configuration values
+    - `TestUtils.kt`: In-memory Room database factory, Flow condition waiting, overlay show/hide helpers, test notification posting, retry with backoff, and `runBlockingTest` extension
+    - Updated `libs.versions.toml` with MockK (1.13.13), Turbine (1.2.0), Coroutines Test (1.9.0), Room Testing (2.8.4), UI Automator (2.3.0), and Test Core/Runner/Rules
+    - Updated `app/build.gradle.kts` with all test dependencies
+    - Build verified successful with `./gradlew :app:compileDebugAndroidTestKotlin`
 
 - [ ] Create Room database tests:
   - Create `app/src/androidTest/java/com/yazan/jetoverlay/data/MessageDaoTest.kt`:
