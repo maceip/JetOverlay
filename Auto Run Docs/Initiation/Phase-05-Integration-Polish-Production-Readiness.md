@@ -4,7 +4,7 @@ This phase ties all components together into a cohesive, production-ready applic
 
 ## Tasks
 
-- [ ] Enhance permission onboarding flow:
+- [x] Enhance permission onboarding flow:
   - Read existing `app/src/main/java/com/yazan/jetoverlay/OverlayControlPanel.kt`
   - Create step-by-step permission wizard:
     - Show clear explanation for each permission before requesting
@@ -17,6 +17,14 @@ This phase ties all components together into a cohesive, production-ready applic
   - Handle permission denial gracefully:
     - Show explanation why permission is needed
     - Offer to open app Settings for manual grant
+
+  **Implementation Notes:**
+  - Created `PermissionManager.kt` utility class for centralized permission handling
+  - Created `PermissionWizard.kt` composable with step-by-step UI and animated transitions
+  - Integrated wizard into `OverlayControlPanel.kt` with AnimatedContent transitions
+  - Permission status persisted in SharedPreferences with denial count tracking
+  - Shows rationale after first denial, opens Settings after second denial
+  - Unit tests in `util/PermissionManagerTest.kt`, UI tests in `ui/PermissionWizardTest.kt`
 
 - [ ] Implement proper logging and error reporting:
   - Create `app/src/main/java/com/yazan/jetoverlay/util/Logger.kt`:

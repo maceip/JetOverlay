@@ -7,9 +7,13 @@ import android.os.Build
 import android.provider.Settings
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -26,8 +30,10 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Call
@@ -53,6 +59,7 @@ import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -62,6 +69,8 @@ import androidx.lifecycle.compose.LifecycleResumeEffect
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.yazan.jetoverlay.api.OverlayConfig
 import com.yazan.jetoverlay.api.OverlaySdk
+import com.yazan.jetoverlay.ui.PermissionWizard
+import com.yazan.jetoverlay.util.PermissionManager
 
 // --- The Control Panel UI ---
 
@@ -69,76 +78,104 @@ import com.yazan.jetoverlay.api.OverlaySdk
 fun OverlayControlPanel(modifier: Modifier = Modifier) {
     val context = LocalContext.current
 
+    // Initialize PermissionManager
+    val permissionManager = remember { PermissionManager(context) }
+
     // Observe Active Overlays from SDK
     val activeOverlays by OverlaySdk.activeOverlays.collectAsStateWithLifecycle()
 
-    // 1. Check Overlay Permission
-    var hasOverlayPermission by remember {
-        mutableStateOf(Settings.canDrawOverlays(context))
+    // Track if all required permissions are granted
+    var allRequiredPermissionsGranted by remember {
+        mutableStateOf(permissionManager.areAllRequiredPermissionsGranted())
     }
 
-    // 2. Check Notification Permission (Android 13+)
-    var hasNotificationPermission by remember {
-        mutableStateOf(
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-                ContextCompat.checkSelfPermission(
-                    context,
-                    Manifest.permission.POST_NOTIFICATIONS
-                ) == PackageManager.PERMISSION_GRANTED
-            } else {
-                true // Implicitly granted below API 33
-            }
-        )
-    }
-
-    // Launcher for Notification Permission
-    val notificationPermissionLauncher = rememberLauncherForActivityResult(
-        contract = ActivityResultContracts.RequestPermission(),
-        onResult = { isGranted ->
-            hasNotificationPermission = isGranted
-        }
-    )
+    // Track if user has completed the wizard (either granted all or skipped optional)
+    var wizardCompleted by remember { mutableStateOf(allRequiredPermissionsGranted) }
 
     // --- AUTO-REFRESH LOGIC (LifecycleResumeEffect) ---
     LifecycleResumeEffect(Unit) {
-        val newOverlayPermission = Settings.canDrawOverlays(context)
-        if (newOverlayPermission != hasOverlayPermission) {
-            hasOverlayPermission = newOverlayPermission
-        }
+        // Re-check all permissions on resume (user may have changed in Settings)
+        val wasGranted = allRequiredPermissionsGranted
+        allRequiredPermissionsGranted = permissionManager.areAllRequiredPermissionsGranted()
 
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-            val newNotifPermission = ContextCompat.checkSelfPermission(
-                context,
-                Manifest.permission.POST_NOTIFICATIONS
-            ) == PackageManager.PERMISSION_GRANTED
+        // Update persistent storage
+        permissionManager.updateAllPermissionStatuses()
 
-            if (newNotifPermission != hasNotificationPermission) {
-                hasNotificationPermission = newNotifPermission
-            }
+        // Log if permission status changed
+        if (wasGranted != allRequiredPermissionsGranted) {
+            android.util.Log.d("OverlayControlPanel",
+                "Permission status changed: $wasGranted -> $allRequiredPermissionsGranted")
         }
 
         onPauseOrDispose { }
     }
 
     // --- AUTO-SHOW ON LAUNCH ---
-    // If we have permissions, just show the agent bubble immediately so the user sees something.
-    LaunchedEffect(hasOverlayPermission, hasNotificationPermission) {
-         if (hasOverlayPermission && hasNotificationPermission) {
-             if (!OverlaySdk.isOverlayActive("agent_bubble")) {
-                 OverlaySdk.show(
-                     context = context,
-                     config = OverlayConfig(
-                         id = "agent_bubble",
-                         type = "overlay_1", 
-                         initialX = 100,
-                         initialY = 300
-                     )
-                 )
-             }
-         }
+    // If we have all required permissions, show the agent bubble.
+    LaunchedEffect(allRequiredPermissionsGranted, wizardCompleted) {
+        if (allRequiredPermissionsGranted && wizardCompleted) {
+            if (!OverlaySdk.isOverlayActive("agent_bubble")) {
+                OverlaySdk.show(
+                    context = context,
+                    config = OverlayConfig(
+                        id = "agent_bubble",
+                        type = "overlay_1",
+                        initialX = 100,
+                        initialY = 300
+                    )
+                )
+            }
+        }
     }
 
-    Column(modifier = modifier.fillMaxSize().padding(16.dp)) {
+    // Main content with animated transition between wizard and main panel
+    AnimatedContent(
+        targetState = allRequiredPermissionsGranted && wizardCompleted,
+        transitionSpec = {
+            fadeIn(animationSpec = tween(300)) togetherWith fadeOut(animationSpec = tween(300))
+        },
+        label = "control_panel_content",
+        modifier = modifier
+    ) { showMainPanel ->
+        if (showMainPanel) {
+            // Main control panel - all required permissions granted
+            MainControlPanel(
+                permissionManager = permissionManager,
+                modifier = Modifier.fillMaxSize()
+            )
+        } else {
+            // Permission wizard - guide user through permission setup
+            PermissionWizard(
+                permissionManager = permissionManager,
+                onAllPermissionsGranted = {
+                    allRequiredPermissionsGranted = true
+                    wizardCompleted = true
+                },
+                onSkipOptional = {
+                    wizardCompleted = true
+                },
+                modifier = Modifier.fillMaxSize()
+            )
+        }
+    }
+}
+
+/**
+ * Main control panel shown after all required permissions are granted.
+ */
+@Composable
+private fun MainControlPanel(
+    permissionManager: PermissionManager,
+    modifier: Modifier = Modifier
+) {
+    val context = LocalContext.current
+    val scrollState = rememberScrollState()
+
+    Column(
+        modifier = modifier
+            .padding(16.dp)
+            .verticalScroll(scrollState)
+    ) {
         Text(
             text = "Overlay Agent",
             style = MaterialTheme.typography.headlineMedium,
@@ -153,242 +190,167 @@ fun OverlayControlPanel(modifier: Modifier = Modifier) {
 
         Spacer(modifier = Modifier.height(24.dp))
 
-        when {
-            // Priority 1: Overlay Permission
-            !hasOverlayPermission -> {
-                PermissionWarningCard(
-                    title = "Overlay Permission Required",
-                    text = "Tap to enable 'Display over other apps'",
-                    icon = Icons.Rounded.Add
-                ) {
-                    val intent = Intent(
-                        Settings.ACTION_MANAGE_OVERLAY_PERMISSION,
-                        "package:${context.packageName}".toUri()
+        // Active Status Card
+        Card(
+            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(200.dp)
+                .testTag("status_card"),
+            shape = RoundedCornerShape(16.dp)
+        ) {
+            Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                    Icon(
+                        imageVector = Icons.Default.Notifications,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier.size(48.dp)
                     )
-                    context.startActivity(intent)
-                }
-            }
-
-            // Priority 3: Runtime Permissions (Audio/Phone)
-            !hasNotificationPermission -> {
-                PermissionWarningCard(
-                    title = "Notifications Required",
-                    text = "Tap to enable notifications for the active service",
-                    icon = Icons.Default.Notifications
-                ) {
-                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-                        notificationPermissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
-                    }
-                }
-            }
-
-            // Priority 3: Notification Listener Access (Read/Reply)
-            !Settings.Secure.getString(context.contentResolver, "enabled_notification_listeners").orEmpty().contains(context.packageName) -> {
-                PermissionWarningCard(
-                    title = "Read/Reply Access Required",
-                    text = "Tap to grant Notification Access for intelligence",
-                    icon = Icons.Default.Notifications
-                ) {
-                    val intent = Intent(Settings.ACTION_NOTIFICATION_LISTENER_SETTINGS)
-                    context.startActivity(intent)
-                }
-            }
-
-            // Priority 4: Runtime Permissions (Audio & Phone)
-            context.checkSelfPermission(Manifest.permission.RECORD_AUDIO) != PackageManager.PERMISSION_GRANTED ||
-            context.checkSelfPermission(Manifest.permission.ANSWER_PHONE_CALLS) != PackageManager.PERMISSION_GRANTED ||
-            context.checkSelfPermission(Manifest.permission.READ_PHONE_STATE) != PackageManager.PERMISSION_GRANTED -> {
-                
-                val multiplePermissionsLauncher = rememberLauncherForActivityResult(
-                    contract = ActivityResultContracts.RequestMultiplePermissions(),
-                    onResult = { 
-                        // Refresh will handle
-                    }
-                )
-
-                PermissionWarningCard(
-                    title = "Permissions Required",
-                    text = "Allow Audio & Phone access for Agent features",
-                    icon = Icons.Default.Call
-                ) {
-                    multiplePermissionsLauncher.launch(
-                        arrayOf(
-                            Manifest.permission.RECORD_AUDIO,
-                            Manifest.permission.ANSWER_PHONE_CALLS,
-                            Manifest.permission.READ_PHONE_STATE,
-                            Manifest.permission.READ_CONTACTS
-                        )
+                    Spacer(modifier = Modifier.height(16.dp))
+                    Text(
+                        text = "Agent is Listening",
+                        style = MaterialTheme.typography.titleLarge,
+                        fontWeight = FontWeight.Bold
                     )
-                }
-            }
-
-            // Priority 3: Call Screening Role (Android 10+)
-            Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q &&
-            !context.getSystemService(android.app.role.RoleManager::class.java).isRoleHeld(android.app.role.RoleManager.ROLE_CALL_SCREENING) -> {
-                val roleLauncher = rememberLauncherForActivityResult(
-                    contract = ActivityResultContracts.StartActivityForResult(),
-                    onResult = {
-                        // Refresh UI will handle state change
-                        android.util.Log.d("OverlayControlPanel", "Role request result: $it")
-                    }
-                )
-
-                PermissionWarningCard(
-                    title = "Call Screening Required",
-                    text = "Tap to set as Default Call Screening App",
-                    icon = Icons.Default.Call
-                ) {
-                   try {
-                       android.util.Log.d("OverlayControlPanel", "Requesting Call Screening Role")
-                       val roleManager = context.getSystemService(android.app.role.RoleManager::class.java)
-                       val intent = roleManager.createRequestRoleIntent(android.app.role.RoleManager.ROLE_CALL_SCREENING)
-                       roleLauncher.launch(intent)
-                   } catch (e: Exception) {
-                       android.util.Log.e("OverlayControlPanel", "Failed to request role", e)
-                       // Fallback to settings
-                       val intent = Intent(Settings.ACTION_MANAGE_DEFAULT_APPS_SETTINGS)
-                       context.startActivity(intent)
-                   }
-                }
-            }
-
-            // Priority 5: SMS Permissions
-            context.checkSelfPermission(Manifest.permission.RECEIVE_SMS) != PackageManager.PERMISSION_GRANTED ||
-            context.checkSelfPermission(Manifest.permission.READ_SMS) != PackageManager.PERMISSION_GRANTED -> {
-                val smsPermissionsLauncher = rememberLauncherForActivityResult(
-                    contract = ActivityResultContracts.RequestMultiplePermissions(),
-                    onResult = {
-                        // Refresh will handle
-                    }
-                )
-
-                PermissionWarningCard(
-                    title = "SMS Permissions Required",
-                    text = "Allow SMS access to intercept text messages",
-                    icon = Icons.Default.Email
-                ) {
-                    smsPermissionsLauncher.launch(
-                        arrayOf(
-                            Manifest.permission.RECEIVE_SMS,
-                            Manifest.permission.READ_SMS
-                        )
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Text(
+                        text = "Waiting for new messages...",
+                        style = MaterialTheme.typography.bodyMedium
                     )
-                }
-            }
-
-            // Priority 6: Active Status
-            else -> {
-                Card(
-                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
-                    modifier = Modifier.fillMaxWidth().height(200.dp),
-                    shape = RoundedCornerShape(16.dp)
-                ) {
-                    Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                            Icon(
-                                imageVector = Icons.Default.Notifications,
-                                contentDescription = null,
-                                tint = MaterialTheme.colorScheme.primary,
-                                modifier = Modifier.size(48.dp)
-                            )
-                            Spacer(modifier = Modifier.height(16.dp))
-                            Text(
-                                text = "Agent is Listening",
-                                style = MaterialTheme.typography.titleLarge,
-                                fontWeight = FontWeight.Bold
-                            )
-                            Spacer(modifier = Modifier.height(8.dp))
-                            Text(
-                                text = "Waiting for new messages...",
-                                style = MaterialTheme.typography.bodyMedium
-                            )
-                        }
-                    }
-                }
-                
-                // Integrations Section
-                Spacer(modifier = Modifier.height(24.dp))
-                Text(
-                    text = "Integrations",
-                    style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.Bold,
-                    color = MaterialTheme.colorScheme.primary
-                )
-                Spacer(modifier = Modifier.height(8.dp))
-                
-                Card(
-                    modifier = Modifier.fillMaxWidth(),
-                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
-                ) {
-                    Column(modifier = Modifier.padding(16.dp)) {
-                        androidx.compose.material3.Button(
-                            onClick = {
-                                com.yazan.jetoverlay.service.integration.SlackIntegration.startOAuth(context)
-                            },
-                            modifier = Modifier.fillMaxWidth()
-                        ) {
-                            Text("Connect Slack")
-                        }
-                        Spacer(modifier = Modifier.height(8.dp))
-                        androidx.compose.material3.Button(
-                            onClick = {
-                                com.yazan.jetoverlay.service.integration.EmailIntegration.startOAuth(context)
-                            },
-                            modifier = Modifier.fillMaxWidth()
-                        ) {
-                            Icon(
-                                imageVector = Icons.Default.Email,
-                                contentDescription = null,
-                                modifier = Modifier.size(18.dp)
-                            )
-                            Spacer(modifier = Modifier.width(8.dp))
-                            Text("Connect Email")
-                        }
-                        Spacer(modifier = Modifier.height(8.dp))
-                        androidx.compose.material3.Button(
-                            onClick = {
-                                com.yazan.jetoverlay.service.integration.NotionIntegration.startOAuth(context)
-                            },
-                            modifier = Modifier.fillMaxWidth()
-                        ) {
-                            Text("Connect Notion")
-                        }
-                        Spacer(modifier = Modifier.height(8.dp))
-                        androidx.compose.material3.Button(
-                            onClick = {
-                                com.yazan.jetoverlay.service.integration.GitHubIntegration.startOAuth(context)
-                            },
-                            modifier = Modifier.fillMaxWidth()
-                        ) {
-                            Text("Connect GitHub")
-                        }
-                    }
-                }
-                
-                Spacer(modifier = Modifier.height(24.dp))
-                
-                // Debug Button
-                androidx.compose.material3.Button(
-                    onClick = {
-                        // Manually trigger the agent bubble for testing
-                        if (!OverlaySdk.isOverlayActive("agent_bubble")) {
-                            OverlaySdk.show(
-                                context = context,
-                                config = OverlayConfig(
-                                    id = "agent_bubble",
-                                    type = "overlay_1", 
-                                    initialX = 100,
-                                    initialY = 300
-                                )
-                            )
-                        }
-                    },
-                    modifier = Modifier.fillMaxWidth()
-                ) {
-                    Text("Test: Spawn Agent Bubble")
                 }
             }
         }
+
+        // Permission Status Summary (optional permissions)
+        val optionalPermissions = PermissionManager.RequiredPermission.allOptional()
+        val optionalStatuses = optionalPermissions.map { permissionManager.isPermissionGranted(it) }
+        val grantedOptionalCount = optionalStatuses.count { it }
+
+        if (grantedOptionalCount < optionalPermissions.size) {
+            Spacer(modifier = Modifier.height(16.dp))
+            Card(
+                colors = CardDefaults.cardColors(
+                    containerColor = MaterialTheme.colorScheme.secondaryContainer
+                ),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clickable {
+                        // Could navigate to permissions screen
+                    }
+                    .testTag("optional_permissions_card"),
+                shape = RoundedCornerShape(12.dp)
+            ) {
+                Row(
+                    modifier = Modifier.padding(16.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Icon(
+                        imageVector = Icons.Rounded.Add,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.onSecondaryContainer
+                    )
+                    Spacer(modifier = Modifier.width(12.dp))
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(
+                            text = "Optional Permissions",
+                            style = MaterialTheme.typography.titleSmall,
+                            fontWeight = FontWeight.Medium,
+                            color = MaterialTheme.colorScheme.onSecondaryContainer
+                        )
+                        Text(
+                            text = "$grantedOptionalCount of ${optionalPermissions.size} granted",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSecondaryContainer.copy(alpha = 0.7f)
+                        )
+                    }
+                }
+            }
+        }
+
+        // Integrations Section
+        Spacer(modifier = Modifier.height(24.dp))
+        Text(
+            text = "Integrations",
+            style = MaterialTheme.typography.titleMedium,
+            fontWeight = FontWeight.Bold,
+            color = MaterialTheme.colorScheme.primary
+        )
+        Spacer(modifier = Modifier.height(8.dp))
+
+        Card(
+            modifier = Modifier.fillMaxWidth(),
+            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
+        ) {
+            Column(modifier = Modifier.padding(16.dp)) {
+                androidx.compose.material3.Button(
+                    onClick = {
+                        com.yazan.jetoverlay.service.integration.SlackIntegration.startOAuth(context)
+                    },
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Text("Connect Slack")
+                }
+                Spacer(modifier = Modifier.height(8.dp))
+                androidx.compose.material3.Button(
+                    onClick = {
+                        com.yazan.jetoverlay.service.integration.EmailIntegration.startOAuth(context)
+                    },
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Email,
+                        contentDescription = null,
+                        modifier = Modifier.size(18.dp)
+                    )
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text("Connect Email")
+                }
+                Spacer(modifier = Modifier.height(8.dp))
+                androidx.compose.material3.Button(
+                    onClick = {
+                        com.yazan.jetoverlay.service.integration.NotionIntegration.startOAuth(context)
+                    },
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Text("Connect Notion")
+                }
+                Spacer(modifier = Modifier.height(8.dp))
+                androidx.compose.material3.Button(
+                    onClick = {
+                        com.yazan.jetoverlay.service.integration.GitHubIntegration.startOAuth(context)
+                    },
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Text("Connect GitHub")
+                }
+            }
+        }
+
+        Spacer(modifier = Modifier.height(24.dp))
+
+        // Debug Button
+        androidx.compose.material3.Button(
+            onClick = {
+                // Manually trigger the agent bubble for testing
+                if (!OverlaySdk.isOverlayActive("agent_bubble")) {
+                    OverlaySdk.show(
+                        context = context,
+                        config = OverlayConfig(
+                            id = "agent_bubble",
+                            type = "overlay_1",
+                            initialX = 100,
+                            initialY = 300
+                        )
+                    )
+                }
+            },
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            Text("Test: Spawn Agent Bubble")
+        }
+
+        Spacer(modifier = Modifier.height(16.dp))
     }
 }
 // Removed OverlayOptionCard
