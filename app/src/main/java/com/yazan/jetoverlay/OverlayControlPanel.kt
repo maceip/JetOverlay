@@ -344,6 +344,15 @@ fun OverlayControlPanel(modifier: Modifier = Modifier) {
                             Spacer(modifier = Modifier.width(8.dp))
                             Text("Connect Email")
                         }
+                        Spacer(modifier = Modifier.height(8.dp))
+                        androidx.compose.material3.Button(
+                            onClick = {
+                                com.yazan.jetoverlay.service.integration.NotionIntegration.startOAuth(context)
+                            },
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Text("Connect Notion")
+                        }
                     }
                 }
                 

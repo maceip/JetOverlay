@@ -47,13 +47,14 @@ This phase builds the unified data ingestion pipeline that captures messages fro
   - Reduce polling frequency to 15 seconds for production use
   - **Completed:** Created `SlackConfig.kt` with full configuration persistence including OAuth tokens (access_token, bot_token), workspace info (workspace_id, workspace_name, user_id), last poll timestamp for duplicate detection, and exponential backoff state (current_backoff, last_error_timestamp). Enhanced `SlackIntegration.kt` with exponential backoff (5s initial, 60s max, 2x multiplier), comprehensive OAuth error logging (error codes, descriptions, full response bodies), last poll timestamp integration using Slack API format, and 15-second polling interval (via `SlackConfig.DEFAULT_POLL_INTERVAL_MS`). Created unit tests in `SlackConfigTest.kt` (7 tests for constants and backoff math) and `SlackIntegrationTest.kt` (2 tests for constants and singleton). Created instrumented tests in `data/SlackConfigTest.kt` (26 tests covering token storage, workspace info, poll timestamps, exponential backoff, and debug info). All tests pass.
 
-- [ ] Create Notion integration stub:
+- [x] Create Notion integration stub:
   - Create `app/src/main/java/com/yazan/jetoverlay/service/integration/NotionIntegration.kt`:
     - Object/singleton matching SlackIntegration pattern
     - Stub methods: `startOAuth(context)`, `handleOAuthCallback(code)`, `pollForNotifications()`
     - `pollForNotifications()` returns mock Notion mention notifications
     - Log "Notion integration not yet implemented - returning mock data"
   - Add placeholder UI button in `OverlayControlPanel.kt` for "Connect Notion"
+  - **Completed:** Created `NotionIntegration.kt` as an object/singleton with full OAuth flow stub (`startOAuth`, `handleOAuthCallback`), mock polling with 30-second interval, and message ingestion via `MessageRepository` with `packageName="notion"`. Implemented `NotionNotificationType` enum with MENTION, COMMENT, PAGE_UPDATE, and DATABASE_UPDATE types. Created `MockNotionNotification` data class with id, type, pageTitle, author, and content fields. Added "Connect Notion" button in `OverlayControlPanel.kt` in the Integrations section. Created unit tests in `NotionIntegrationTest.kt` (10 tests for data class operations, singleton verification, and enum operations). All tests pass.
 
 - [ ] Create GitHub integration stub:
   - Create `app/src/main/java/com/yazan/jetoverlay/service/integration/GitHubIntegration.kt`:
