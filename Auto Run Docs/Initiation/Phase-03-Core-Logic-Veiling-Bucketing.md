@@ -72,7 +72,7 @@ This phase implements the intelligence layer that processes incoming messages. M
   - Ensure all repository methods properly emit Flow updates
   - **Completed:** Added `getMessagesByBucket(bucket: String): Flow<List<Message>>` query to MessageDao for filtering messages by bucket category. Added `updateBucket(id: Long, bucket: String)` query to MessageDao for direct bucket updates. Added `applyBucket(messageId: Long, bucket: String)` method to MessageRepository. Added `getMessagesByBucket(bucket: String)` method to MessageRepository. Created MessageRepositoryTest.kt with 16 unit tests covering all bucket types, applyBucket operations, Flow emission updates, and edge cases - all passing.
 
-- [ ] Write unit tests for categorization and veiling:
+- [x] Write unit tests for categorization and veiling:
   - Create `app/src/test/java/com/yazan/jetoverlay/domain/MessageCategorizerTest.kt`:
     - Test each bucket classification with sample messages
     - Test edge cases and unknown senders
@@ -82,6 +82,7 @@ This phase implements the intelligence layer that processes incoming messages. M
   - Create `app/src/test/java/com/yazan/jetoverlay/domain/StubLlmServiceTest.kt`:
     - Test that stub always returns expected responses
     - Test that delay is applied
+  - **Completed:** Verified all unit tests exist and pass. MessageCategorizerTest.kt has 28 tests covering all bucket classifications (URGENT, WORK, SOCIAL, PROMOTIONAL, TRANSACTIONAL, UNKNOWN), priority handling, case-insensitive matching, and edge cases. VeilGeneratorTest.kt has 28 tests verifying veil generation for each bucket type, sender sanitization (XSS prevention), content leak prevention (emails, passwords, phone numbers, OTPs never exposed), and app name extraction. StubLlmServiceTest.kt has 19 tests confirming expected responses ("hello", "Got it!", "Thanks!"), delay application (~500ms), consistent responses across all buckets, and edge cases. All 75 tests pass successfully.
 
 - [ ] Write integration tests for complete processing pipeline:
   - Create `app/src/androidTest/java/com/yazan/jetoverlay/domain/MessageProcessorIntegrationTest.kt`:
