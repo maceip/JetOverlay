@@ -84,7 +84,7 @@ This phase implements the intelligence layer that processes incoming messages. M
     - Test that delay is applied
   - **Completed:** Verified all unit tests exist and pass. MessageCategorizerTest.kt has 28 tests covering all bucket classifications (URGENT, WORK, SOCIAL, PROMOTIONAL, TRANSACTIONAL, UNKNOWN), priority handling, case-insensitive matching, and edge cases. VeilGeneratorTest.kt has 28 tests verifying veil generation for each bucket type, sender sanitization (XSS prevention), content leak prevention (emails, passwords, phone numbers, OTPs never exposed), and app name extraction. StubLlmServiceTest.kt has 19 tests confirming expected responses ("hello", "Got it!", "Thanks!"), delay application (~500ms), consistent responses across all buckets, and edge cases. All 75 tests pass successfully.
 
-- [ ] Write integration tests for complete processing pipeline:
+- [x] Write integration tests for complete processing pipeline:
   - Create `app/src/androidTest/java/com/yazan/jetoverlay/domain/MessageProcessorIntegrationTest.kt`:
     - Insert a RECEIVED message into database
     - Verify MessageProcessor picks it up and processes it
@@ -92,6 +92,16 @@ This phase implements the intelligence layer that processes incoming messages. M
     - Verify veiledContent is generated
     - Verify generatedResponses are populated
     - Verify status transitions to PROCESSED
+  - **Completed:** Created comprehensive MessageProcessorIntegrationTest.kt with 18 integration tests covering:
+    - End-to-end processing flow (RECEIVED → PROCESSED)
+    - Bucket assignment verification for all 6 bucket types (URGENT, WORK, SOCIAL, PROMOTIONAL, TRANSACTIONAL, UNKNOWN)
+    - VeiledContent generation for each bucket type
+    - Response generation from StubLlmService (["hello", "Got it!", "Thanks!"])
+    - Status transition verification (only processes RECEIVED, ignores PROCESSED/QUEUED/SENT)
+    - Concurrent multi-message processing
+    - Security tests: veiled content never exposes sensitive data (passwords, SSNs), sender sanitization (XSS prevention)
+    - Edge cases: empty content, empty sender, long content, unicode content
+    - Uses in-memory Room database and Turbine for Flow testing
 
 - [ ] Run all tests and verify processing pipeline:
   - Execute `./gradlew test` for unit tests
