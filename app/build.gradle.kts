@@ -97,4 +97,7 @@ dependencies {
     implementation(libs.gson)
     implementation(libs.okhttp)
     implementation(libs.androidx.browser)
+
+    // WorkManager for battery-efficient background tasks
+    implementation(libs.androidx.work.runtime.ktx)
 }

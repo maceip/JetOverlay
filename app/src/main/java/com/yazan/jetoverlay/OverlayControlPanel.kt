@@ -69,10 +69,22 @@ import androidx.lifecycle.compose.LifecycleResumeEffect
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.yazan.jetoverlay.api.OverlayConfig
 import com.yazan.jetoverlay.api.OverlaySdk
+import com.yazan.jetoverlay.ui.OnboardingManager
+import com.yazan.jetoverlay.ui.OnboardingScreen
 import com.yazan.jetoverlay.ui.PermissionWizard
+import com.yazan.jetoverlay.util.Logger
 import com.yazan.jetoverlay.util.PermissionManager
 
 // --- The Control Panel UI ---
+
+/**
+ * UI state for the control panel.
+ */
+private enum class ControlPanelState {
+    ONBOARDING,      // First-run onboarding experience
+    PERMISSION_SETUP, // Permission wizard (if user skipped onboarding somehow)
+    MAIN_PANEL       // Main control panel
+}
 
 @Composable
 fun OverlayControlPanel(modifier: Modifier = Modifier) {
@@ -84,6 +96,10 @@ fun OverlayControlPanel(modifier: Modifier = Modifier) {
     // Observe Active Overlays from SDK
     val activeOverlays by OverlaySdk.activeOverlays.collectAsStateWithLifecycle()
 
+    // Check first-run and onboarding status
+    val isFirstLaunch = remember { OnboardingManager.isFirstLaunch(context) }
+    val onboardingComplete = remember { mutableStateOf(OnboardingManager.isOnboardingComplete(context)) }
+
     // Track if all required permissions are granted
     var allRequiredPermissionsGranted by remember {
         mutableStateOf(permissionManager.areAllRequiredPermissionsGranted())
@@ -92,29 +108,41 @@ fun OverlayControlPanel(modifier: Modifier = Modifier) {
     // Track if user has completed the wizard (either granted all or skipped optional)
     var wizardCompleted by remember { mutableStateOf(allRequiredPermissionsGranted) }
 
+    // Determine current state
+    val currentState = remember(onboardingComplete.value, allRequiredPermissionsGranted, wizardCompleted) {
+        when {
+            !onboardingComplete.value -> ControlPanelState.ONBOARDING
+            !allRequiredPermissionsGranted || !wizardCompleted -> ControlPanelState.PERMISSION_SETUP
+            else -> ControlPanelState.MAIN_PANEL
+        }
+    }
+
     // --- AUTO-REFRESH LOGIC (LifecycleResumeEffect) ---
     LifecycleResumeEffect(Unit) {
         // Re-check all permissions on resume (user may have changed in Settings)
         val wasGranted = allRequiredPermissionsGranted
         allRequiredPermissionsGranted = permissionManager.areAllRequiredPermissionsGranted()
 
+        // Re-check onboarding status
+        onboardingComplete.value = OnboardingManager.isOnboardingComplete(context)
+
         // Update persistent storage
         permissionManager.updateAllPermissionStatuses()
 
         // Log if permission status changed
         if (wasGranted != allRequiredPermissionsGranted) {
-            android.util.Log.d("OverlayControlPanel",
-                "Permission status changed: $wasGranted -> $allRequiredPermissionsGranted")
+            Logger.i("OverlayControlPanel", "Permission status changed: $wasGranted -> $allRequiredPermissionsGranted")
         }
 
         onPauseOrDispose { }
     }
 
     // --- AUTO-SHOW ON LAUNCH ---
-    // If we have all required permissions, show the agent bubble.
-    LaunchedEffect(allRequiredPermissionsGranted, wizardCompleted) {
-        if (allRequiredPermissionsGranted && wizardCompleted) {
+    // If we have all required permissions and onboarding is complete, show the agent bubble.
+    LaunchedEffect(currentState) {
+        if (currentState == ControlPanelState.MAIN_PANEL) {
             if (!OverlaySdk.isOverlayActive("agent_bubble")) {
+                Logger.uiState("OverlayControlPanel", "Auto-showing agent bubble")
                 OverlaySdk.show(
                     context = context,
                     config = OverlayConfig(
@@ -128,34 +156,49 @@ fun OverlayControlPanel(modifier: Modifier = Modifier) {
         }
     }
 
-    // Main content with animated transition between wizard and main panel
+    // Main content with animated transition between states
     AnimatedContent(
-        targetState = allRequiredPermissionsGranted && wizardCompleted,
+        targetState = currentState,
         transitionSpec = {
             fadeIn(animationSpec = tween(300)) togetherWith fadeOut(animationSpec = tween(300))
         },
         label = "control_panel_content",
         modifier = modifier
-    ) { showMainPanel ->
-        if (showMainPanel) {
-            // Main control panel - all required permissions granted
-            MainControlPanel(
-                permissionManager = permissionManager,
-                modifier = Modifier.fillMaxSize()
-            )
-        } else {
-            // Permission wizard - guide user through permission setup
-            PermissionWizard(
-                permissionManager = permissionManager,
-                onAllPermissionsGranted = {
-                    allRequiredPermissionsGranted = true
-                    wizardCompleted = true
-                },
-                onSkipOptional = {
-                    wizardCompleted = true
-                },
-                modifier = Modifier.fillMaxSize()
-            )
+    ) { state ->
+        when (state) {
+            ControlPanelState.ONBOARDING -> {
+                // First-run onboarding experience
+                OnboardingScreen(
+                    permissionManager = permissionManager,
+                    onOnboardingComplete = {
+                        onboardingComplete.value = true
+                        allRequiredPermissionsGranted = permissionManager.areAllRequiredPermissionsGranted()
+                        wizardCompleted = allRequiredPermissionsGranted
+                    },
+                    modifier = Modifier.fillMaxSize()
+                )
+            }
+            ControlPanelState.PERMISSION_SETUP -> {
+                // Permission wizard (if user skipped onboarding permissions)
+                PermissionWizard(
+                    permissionManager = permissionManager,
+                    onAllPermissionsGranted = {
+                        allRequiredPermissionsGranted = true
+                        wizardCompleted = true
+                    },
+                    onSkipOptional = {
+                        wizardCompleted = true
+                    },
+                    modifier = Modifier.fillMaxSize()
+                )
+            }
+            ControlPanelState.MAIN_PANEL -> {
+                // Main control panel - all setup complete
+                MainControlPanel(
+                    permissionManager = permissionManager,
+                    modifier = Modifier.fillMaxSize()
+                )
+            }
         }
     }
 }

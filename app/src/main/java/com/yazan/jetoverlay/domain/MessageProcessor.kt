@@ -1,8 +1,8 @@
 package com.yazan.jetoverlay.domain
 
-import android.util.Log
 import com.yazan.jetoverlay.data.Message
 import com.yazan.jetoverlay.data.MessageRepository
+import com.yazan.jetoverlay.util.Logger
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -22,13 +22,14 @@ class MessageProcessor(
     private val llmService: LlmService = StubLlmService()
 ) {
     companion object {
-        private const val TAG = "MessageProcessor"
+        private const val COMPONENT = "MessageProcessor"
     }
 
     private val supervisorJob = SupervisorJob()
     private val scope = CoroutineScope(Dispatchers.IO + supervisorJob)
 
     fun start() {
+        Logger.lifecycle(COMPONENT, "start")
         repository.allMessages.onEach { messages ->
             messages.filter { it.status == "RECEIVED" }.forEach { message ->
                 processMessage(message)
@@ -41,25 +42,26 @@ class MessageProcessor(
      * Call this before closing the database to avoid race conditions.
      */
     fun stop() {
+        Logger.lifecycle(COMPONENT, "stop")
         supervisorJob.cancel()
     }
 
     private fun processMessage(message: Message) {
         scope.launch {
             try {
-                Log.d(TAG, "Processing message ${message.id} from ${message.senderName}")
+                Logger.processing(COMPONENT, "Starting processing from ${message.senderName}", message.id)
 
                 // 1. Categorize message -> set bucket
                 val bucket = categorizer.categorize(message)
-                Log.d(TAG, "Message ${message.id} categorized as: ${bucket.name}")
+                Logger.processing(COMPONENT, "Categorized as: ${bucket.name}", message.id)
 
                 // 2. Generate veil -> set veiledContent
                 val veiled = veilGenerator.generateVeil(message, bucket)
-                Log.d(TAG, "Message ${message.id} veiled content: $veiled")
+                Logger.processing(COMPONENT, "Veiled content generated", message.id)
 
                 // 3. Generate responses via LLM service
                 val responses = llmService.generateResponses(message, bucket)
-                Log.d(TAG, "Message ${message.id} generated ${responses.size} responses")
+                Logger.processing(COMPONENT, "Generated ${responses.size} responses", message.id)
 
                 // 4. Update Database (Atomic State Transition)
                 repository.updateMessageState(
@@ -69,10 +71,10 @@ class MessageProcessor(
                     generatedResponses = responses,
                     bucket = bucket.name
                 )
-                Log.d(TAG, "Message ${message.id} processing complete, status: PROCESSED")
+                Logger.processing(COMPONENT, "Complete, status: PROCESSED", message.id)
 
             } catch (e: Exception) {
-                Log.e(TAG, "Error processing message ${message.id}: ${e.message}", e)
+                Logger.e(COMPONENT, "Error processing message ${message.id}: ${e.message}", e)
                 // Keep message in RECEIVED state so it can be retried
             }
         }

@@ -215,4 +215,13 @@ object NotionIntegration {
         val author: String,
         val content: String
     )
+
+    /**
+     * Performs a single sync cycle for WorkManager-based scheduling.
+     * Unlike continuous polling, this fetches notifications once and returns.
+     */
+    suspend fun syncOnce() {
+        Log.d(TAG, "Performing single Notion sync cycle")
+        pollForNotifications()
+    }
 }

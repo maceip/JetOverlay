@@ -9,13 +9,13 @@ import android.content.Intent
 import android.content.pm.ServiceInfo
 import android.os.Build
 import android.os.IBinder
-import android.util.Log
 import com.yazan.jetoverlay.JetOverlayApplication
 import com.yazan.jetoverlay.data.MessageRepository
 import com.yazan.jetoverlay.service.integration.EmailIntegration
 import com.yazan.jetoverlay.service.integration.GitHubIntegration
 import com.yazan.jetoverlay.service.integration.NotionIntegration
 import com.yazan.jetoverlay.service.integration.SlackIntegration
+import com.yazan.jetoverlay.util.Logger
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -38,7 +38,7 @@ import kotlinx.coroutines.cancel
 class DataAcquisitionService : Service() {
 
     companion object {
-        private const val TAG = "DataAcquisitionService"
+        private const val COMPONENT = "DataAcquisitionService"
         private const val CHANNEL_ID = "data_acquisition_channel"
         private const val CHANNEL_NAME = "Data Acquisition"
         private const val NOTIFICATION_ID = 201
@@ -55,7 +55,7 @@ class DataAcquisitionService : Service() {
          */
         fun start(context: Context) {
             if (isRunning) {
-                Log.d(TAG, "Service already running")
+                Logger.d(COMPONENT, "Service already running")
                 return
             }
 
@@ -85,7 +85,7 @@ class DataAcquisitionService : Service() {
 
     override fun onCreate() {
         super.onCreate()
-        Log.d(TAG, "DataAcquisitionService onCreate")
+        Logger.lifecycle(COMPONENT, "onCreate")
 
         isRunning = true
         repository = JetOverlayApplication.instance.repository
@@ -95,13 +95,13 @@ class DataAcquisitionService : Service() {
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
-        Log.d(TAG, "DataAcquisitionService onStartCommand")
+        Logger.lifecycle(COMPONENT, "onStartCommand")
         return START_STICKY
     }
 
     override fun onDestroy() {
         super.onDestroy()
-        Log.d(TAG, "DataAcquisitionService onDestroy")
+        Logger.lifecycle(COMPONENT, "onDestroy")
 
         isRunning = false
         stopAllIntegrations()
@@ -112,55 +112,55 @@ class DataAcquisitionService : Service() {
      * Starts polling for all connected integrations.
      */
     private fun startAllIntegrations() {
-        Log.d(TAG, "Starting all data integrations")
+        Logger.d(COMPONENT, "Starting all data integrations")
 
         // Start Slack polling if connected
         if (SlackIntegration.isConnected()) {
-            Log.d(TAG, "Starting Slack polling")
+            Logger.d(COMPONENT, "Starting Slack polling")
             SlackIntegration.startPolling(repository)
         } else {
-            Log.d(TAG, "Slack not connected, skipping")
+            Logger.d(COMPONENT, "Slack not connected, skipping")
         }
 
         // Start Email polling if connected
         if (EmailIntegration.isConnected()) {
-            Log.d(TAG, "Starting Email polling")
+            Logger.d(COMPONENT, "Starting Email polling")
             EmailIntegration.startPolling()
         } else {
-            Log.d(TAG, "Email not connected, skipping")
+            Logger.d(COMPONENT, "Email not connected, skipping")
         }
 
         // Start Notion polling if connected
         if (NotionIntegration.isConnected()) {
-            Log.d(TAG, "Starting Notion polling")
+            Logger.d(COMPONENT, "Starting Notion polling")
             NotionIntegration.startPolling()
         } else {
-            Log.d(TAG, "Notion not connected, skipping")
+            Logger.d(COMPONENT, "Notion not connected, skipping")
         }
 
         // Start GitHub polling if connected
         if (GitHubIntegration.isConnected()) {
-            Log.d(TAG, "Starting GitHub polling")
+            Logger.d(COMPONENT, "Starting GitHub polling")
             GitHubIntegration.startPolling()
         } else {
-            Log.d(TAG, "GitHub not connected, skipping")
+            Logger.d(COMPONENT, "GitHub not connected, skipping")
         }
 
-        Log.d(TAG, "Integration startup complete")
+        Logger.d(COMPONENT, "Integration startup complete")
     }
 
     /**
      * Stops polling for all integrations.
      */
     private fun stopAllIntegrations() {
-        Log.d(TAG, "Stopping all data integrations")
+        Logger.d(COMPONENT, "Stopping all data integrations")
 
         SlackIntegration.stopPolling()
         EmailIntegration.stopPolling()
         NotionIntegration.stopPolling()
         GitHubIntegration.stopPolling()
 
-        Log.d(TAG, "All integrations stopped")
+        Logger.d(COMPONENT, "All integrations stopped")
     }
 
     /**
@@ -168,7 +168,7 @@ class DataAcquisitionService : Service() {
      * Call this after a successful OAuth connection.
      */
     fun restartIntegration(integrationName: String) {
-        Log.d(TAG, "Restarting integration: $integrationName")
+        Logger.d(COMPONENT, "Restarting integration: $integrationName")
 
         when (integrationName.lowercase()) {
             "slack" -> {
@@ -196,7 +196,7 @@ class DataAcquisitionService : Service() {
                 }
             }
             else -> {
-                Log.w(TAG, "Unknown integration: $integrationName")
+                Logger.w(COMPONENT, "Unknown integration: $integrationName")
             }
         }
     }
@@ -257,9 +257,9 @@ class DataAcquisitionService : Service() {
             } else {
                 startForeground(NOTIFICATION_ID, notification)
             }
-            Log.d(TAG, "Foreground notification started")
+            Logger.d(COMPONENT, "Foreground notification started")
         } catch (e: Exception) {
-            Log.e(TAG, "Failed to start foreground notification", e)
+            Logger.e(COMPONENT, "Failed to start foreground notification", e)
         }
     }
 

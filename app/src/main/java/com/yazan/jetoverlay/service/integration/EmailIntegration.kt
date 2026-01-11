@@ -211,4 +211,13 @@ object EmailIntegration {
         val subject: String,
         val snippet: String
     )
+
+    /**
+     * Performs a single sync cycle for WorkManager-based scheduling.
+     * Unlike continuous polling, this fetches emails once and returns.
+     */
+    suspend fun syncOnce() {
+        Log.d(TAG, "Performing single email sync cycle")
+        pollForEmails()
+    }
 }

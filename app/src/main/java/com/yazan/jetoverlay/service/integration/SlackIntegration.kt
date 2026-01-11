@@ -262,4 +262,13 @@ object SlackIntegration {
             "consecutiveFailures" to consecutiveFailures.toString()
         )
     }
+
+    /**
+     * Performs a single sync cycle for WorkManager-based scheduling.
+     * Unlike continuous polling, this fetches messages once and returns.
+     */
+    suspend fun syncOnce(repository: MessageRepository): Boolean {
+        Log.d(TAG, "Performing single sync cycle")
+        return fetchMessages(repository)
+    }
 }
