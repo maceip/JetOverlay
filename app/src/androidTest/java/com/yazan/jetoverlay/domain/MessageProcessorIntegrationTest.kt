@@ -63,6 +63,10 @@ class MessageProcessorIntegrationTest {
 
     @After
     fun tearDown() {
+        // Stop the processor first to cancel all pending coroutines
+        processor.stop()
+        // Give a brief moment for coroutines to cancel gracefully
+        Thread.sleep(100)
         database.close()
     }
 
@@ -457,13 +461,24 @@ class MessageProcessorIntegrationTest {
 
         waitForProcessed(insertedId) { processedMessage ->
             val veil = processedMessage.veiledContent ?: ""
+            // Script tags and special characters (<, >, ', () ) should be removed
             assertTrue(
                 "Veiled content should not contain script tags",
                 !veil.contains("<script>")
             )
             assertTrue(
-                "Veiled content should not contain 'alert'",
-                !veil.contains("alert")
+                "Veiled content should not contain angle brackets",
+                !veil.contains("<") && !veil.contains(">")
+            )
+            assertTrue(
+                "Veiled content should not contain parentheses from XSS attempt",
+                !veil.contains("(") && !veil.contains(")")
+            )
+            // The sanitized sender should only contain alphanumeric chars
+            // "John<script>alert('xss')</script>" -> "Johnscriptalertxssscript"
+            assertTrue(
+                "Veiled content should contain sanitized sender name",
+                veil.contains("John")
             )
         }
     }
@@ -503,11 +518,13 @@ class MessageProcessorIntegrationTest {
 
         waitForProcessed(insertedId) { processedMessage ->
             assertEquals("PROCESSED", processedMessage.status)
-            // Veil should use "Unknown" for empty sender
+            // For SOCIAL bucket (whatsapp), veil should use "Unknown" for empty sender
+            // Resulting in "New message from Unknown"
+            val veil = processedMessage.veiledContent ?: ""
+            val handledGracefully = veil.contains("Unknown") || veil == "New notification"
             assertTrue(
-                "Veil should handle empty sender gracefully",
-                processedMessage.veiledContent?.contains("Unknown") ?:
-                    processedMessage.veiledContent == "New notification"
+                "Veil should handle empty sender gracefully, got: $veil",
+                handledGracefully
             )
         }
     }

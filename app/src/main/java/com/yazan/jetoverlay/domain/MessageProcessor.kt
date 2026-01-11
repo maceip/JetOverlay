@@ -25,7 +25,8 @@ class MessageProcessor(
         private const val TAG = "MessageProcessor"
     }
 
-    private val scope = CoroutineScope(Dispatchers.IO + SupervisorJob())
+    private val supervisorJob = SupervisorJob()
+    private val scope = CoroutineScope(Dispatchers.IO + supervisorJob)
 
     fun start() {
         repository.allMessages.onEach { messages ->
@@ -33,6 +34,14 @@ class MessageProcessor(
                 processMessage(message)
             }
         }.launchIn(scope)
+    }
+
+    /**
+     * Stops the message processor and cancels all pending coroutines.
+     * Call this before closing the database to avoid race conditions.
+     */
+    fun stop() {
+        supervisorJob.cancel()
     }
 
     private fun processMessage(message: Message) {
