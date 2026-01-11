@@ -191,7 +191,7 @@ This phase completes the user-facing experience by enhancing the floating bubble
     - Tests for large counts, repeated method calls, and edge cases
   - All 302 tests pass successfully
 
-- [ ] Write Compose UI tests for overlay components:
+- [x] Write Compose UI tests for overlay components:
   - Create `app/src/androidTest/java/com/yazan/jetoverlay/ui/FloatingBubbleTest.kt`:
     - Test collapsed state renders correctly
     - Test expansion animation
@@ -202,6 +202,25 @@ This phase completes the user-facing experience by enhancing the floating bubble
     - Test text input works
     - Test cancel returns to previous state
     - Test "Use This" calls callback with edited text
+
+  **Completed:** Created comprehensive Compose UI tests for overlay components:
+  - Created `FloatingBubbleTest.kt` with 44 UI tests covering:
+    - Collapsed state rendering (chat icon, processing spinner, checkmark, pending count badge)
+    - Expansion animation and collapse button functionality
+    - Veil reveal interaction (tap to reveal, content display)
+    - Response chip selection and checkmark display
+    - Action buttons (Edit, Regenerate, Send) with enable/disable states
+    - Dismiss button callback
+    - Bucket filter chips with count display and selection
+    - Navigation indicators (swipe hints)
+    - Individual component tests (ResponseChipsRow, ActionButtonsRow, BucketChip, SwipeNavigationIndicator)
+  - Created `ResponseEditorTest.kt` with 21 UI tests covering:
+    - Text input functionality (placeholder, pre-populated text, text replacement, clearance)
+    - Cancel button display and callback
+    - "Use This" button enable/disable states based on text content
+    - AnimatedResponseEditor visibility transitions
+    - Integration tests with OverlayUiState (editing mode, cancel returns to chips, preserve edited response)
+  - All tests compile successfully with `./gradlew :app:compileDebugAndroidTestKotlin`
 
 - [ ] Run full E2E test of complete workflow:
   - Execute all tests: `./gradlew connectedAndroidTest`
