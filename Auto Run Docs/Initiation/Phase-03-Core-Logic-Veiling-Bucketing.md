@@ -43,7 +43,7 @@ This phase implements the intelligence layer that processes incoming messages. M
   - Update MessageProcessor to use VeilGenerator and MessageCategorizer
   - **Completed:** Created VeilGenerator class with bucket-based veil generation, sender sanitization (removes XSS-prone characters), and app name extraction for work notifications. Updated MessageProcessor to inject and use MessageCategorizer and VeilGenerator. Added bucket parameter to MessageRepository.updateMessageState(). Created 28 unit tests in VeilGeneratorTest.kt verifying all bucket types, content leak prevention, and edge cases - all passing.
 
-- [ ] Create stubbed LLM service for response generation:
+- [x] Create stubbed LLM service for response generation:
   - Create `app/src/main/java/com/yazan/jetoverlay/domain/LlmService.kt`:
     - Interface defining: `suspend fun generateResponses(message: Message, bucket: MessageBucket): List<String>`
   - Create `app/src/main/java/com/yazan/jetoverlay/domain/StubLlmService.kt`:
@@ -51,6 +51,7 @@ This phase implements the intelligence layer that processes incoming messages. M
     - Add artificial delay of 500ms to simulate LLM processing
     - Log "StubLlmService: Returning mock responses for message ${message.id}"
   - Wire StubLlmService into MessageProcessor for response generation
+  - **Completed:** Created LlmService interface with `suspend fun generateResponses(message: Message, bucket: MessageBucket): List<String>`. Created StubLlmService implementation with 500ms delay and logging. Updated MessageProcessor to inject and use LlmService (defaults to StubLlmService). Added testOptions.unitTests.isReturnDefaultValues=true to build.gradle.kts to enable Android mocking in unit tests. Created 19 unit tests in StubLlmServiceTest.kt verifying: expected responses, consistency across buckets, delay application, interface compliance, and edge cases - all passing.
 
 - [ ] Update MessageProcessor to use new components:
   - Modify `app/src/main/java/com/yazan/jetoverlay/domain/MessageProcessor.kt`:

@@ -18,7 +18,8 @@ import kotlinx.coroutines.launch
 class MessageProcessor(
     private val repository: MessageRepository,
     private val categorizer: MessageCategorizer = MessageCategorizer(),
-    private val veilGenerator: VeilGenerator = VeilGenerator()
+    private val veilGenerator: VeilGenerator = VeilGenerator(),
+    private val llmService: LlmService = StubLlmService()
 ) {
     companion object {
         private const val TAG = "MessageProcessor"
@@ -47,12 +48,8 @@ class MessageProcessor(
                 val veiled = veilGenerator.generateVeil(message, bucket)
                 Log.d(TAG, "Message ${message.id} veiled content: $veiled")
 
-                // 3. Generate responses (stubbed for now)
-                val responses = listOf(
-                    "Got it, thanks!",
-                    "Can't talk right now.",
-                    "Call me later?"
-                )
+                // 3. Generate responses via LLM service
+                val responses = llmService.generateResponses(message, bucket)
                 Log.d(TAG, "Message ${message.id} generated ${responses.size} responses")
 
                 // 4. Update Database (Atomic State Transition)
