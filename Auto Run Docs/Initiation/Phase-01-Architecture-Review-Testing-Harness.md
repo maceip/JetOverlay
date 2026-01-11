@@ -16,7 +16,7 @@ This phase establishes the foundation for confident development by auditing the 
   - List any fragility points or recommended fixes
   - **Completed 2026-01-11**: Created comprehensive audit document identifying 6 fragility points including race condition in onDestroy, silent exception swallowing, and potential memory leak in registry. Android 16 compatibility verified - FOREGROUND_SERVICE_TYPE_SPECIAL_USE handling is correct.
 
-- [ ] Audit Hilt/DI setup and service architecture:
+- [x] Audit Hilt/DI setup and service architecture:
   - Read `app/src/main/java/com/yazan/jetoverlay/JetOverlayApplication.kt`
   - Read `app/src/main/java/com/yazan/jetoverlay/service/AppNotificationListenerService.kt`
   - Analyze current dependency injection approach (singleton pattern vs Hilt)
@@ -26,6 +26,7 @@ This phase establishes the foundation for confident development by auditing the 
   - Document findings in `docs/architecture/di-service-audit.md` with front matter:
     - type: analysis, tags: [architecture, dependency-injection, services]
   - Include recommendations for improving testability
+  - **Completed 2026-01-11**: Created comprehensive DI/service architecture audit identifying 6 issues including: inability to inject mock repository (HIGH), MessageProcessor not cancellable (MEDIUM), Application initialization race condition (HIGH), multiple MessageProcessor instances (MEDIUM), ReplyActionCache accumulation (LOW-MEDIUM). Manual singleton pattern works but creates significant barriers to unit testing.
 
 - [ ] Audit data layer and Room database implementation:
   - Read `app/src/main/java/com/yazan/jetoverlay/data/AppDatabase.kt`
