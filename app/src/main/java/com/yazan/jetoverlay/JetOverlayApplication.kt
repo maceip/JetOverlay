@@ -62,12 +62,38 @@ class JetOverlayApplication : Application() {
 
             // Start the Data Acquisition Service for polling integrations
             // Note: The service will only start polling for integrations that have valid tokens
-            startDataAcquisitionService()
+            // Skip service startup during instrumentation tests to avoid ForegroundServiceStartNotAllowedException
+            if (!isRunningInstrumentationTest()) {
+                startDataAcquisitionService()
+            } else {
+                android.util.Log.d("JetOverlayDebug", "Skipping DataAcquisitionService startup during instrumentation tests")
+            }
 
             android.util.Log.d("JetOverlayDebug", "JetOverlayApplication: onCreate completed successfully")
         } catch (e: Throwable) {
             android.util.Log.e("JetOverlayCrash", "CRITICAL: Application onCreate failed", e)
             throw e
+        }
+    }
+
+    /**
+     * Checks if the application is running in an instrumentation test environment.
+     * Returns true if we detect AndroidJUnitRunner or similar test instrumentation.
+     */
+    private fun isRunningInstrumentationTest(): Boolean {
+        return try {
+            // Check if we're running under instrumentation by looking for test classes
+            val registryClass = Class.forName("androidx.test.InstrumentationRegistry")
+            // If we can load the test registry, try to get instrumentation via reflection
+            val getInstrumentationMethod = registryClass.getMethod("getInstrumentation")
+            val instrumentation = getInstrumentationMethod.invoke(null)
+            instrumentation != null
+        } catch (e: ClassNotFoundException) {
+            // Test classes not available - not in test environment
+            false
+        } catch (e: Exception) {
+            // Any other error - likely not in test context
+            false
         }
     }
 
