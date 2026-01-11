@@ -34,6 +34,12 @@ class OverlayUiState(
     val currentBucket: MessageBucket
         get() = MessageBucket.fromString(message.bucket)
 
+    // Selected bucket for filtering (null = show all)
+    var selectedBucket: MessageBucket? by mutableStateOf(null)
+
+    // Pending counts per bucket for badge display
+    var pendingCounts: Map<MessageBucket, Int> by mutableStateOf(emptyMap())
+
     // Derived states
     val displayContent: String
         get() = if (isRevealed) message.originalContent else (message.veiledContent ?: "New Message")
@@ -73,4 +79,20 @@ class OverlayUiState(
     fun updatePendingCount(count: Int) {
         pendingMessageCount = count
     }
+
+    fun selectBucket(bucket: MessageBucket?) {
+        selectedBucket = bucket
+    }
+
+    fun updatePendingCounts(counts: Map<MessageBucket, Int>) {
+        pendingCounts = counts
+        // Update total pending count
+        pendingMessageCount = counts.values.sum()
+    }
+
+    // Get buckets that have pending messages, sorted by priority
+    val bucketsWithPendingMessages: List<MessageBucket>
+        get() = pendingCounts.filter { it.value > 0 }
+            .keys
+            .sortedBy { it.ordinal }
 }

@@ -203,4 +203,118 @@ class OverlayUiStateTest {
         uiState.updateMessage(newMessage)
         assertEquals("New Sender", uiState.message.senderName)
     }
+
+    // Bucket filtering tests
+
+    @Test
+    fun `initial selectedBucket is null`() {
+        assertEquals(null, uiState.selectedBucket)
+    }
+
+    @Test
+    fun `selectBucket sets selectedBucket correctly`() {
+        uiState.selectBucket(MessageBucket.URGENT)
+        assertEquals(MessageBucket.URGENT, uiState.selectedBucket)
+    }
+
+    @Test
+    fun `selectBucket can be set to null to show all`() {
+        uiState.selectBucket(MessageBucket.WORK)
+        uiState.selectBucket(null)
+        assertEquals(null, uiState.selectedBucket)
+    }
+
+    @Test
+    fun `initial pendingCounts is empty map`() {
+        assertEquals(emptyMap<MessageBucket, Int>(), uiState.pendingCounts)
+    }
+
+    @Test
+    fun `updatePendingCounts sets pendingCounts correctly`() {
+        val counts = mapOf(
+            MessageBucket.URGENT to 2,
+            MessageBucket.WORK to 5,
+            MessageBucket.SOCIAL to 3
+        )
+        uiState.updatePendingCounts(counts)
+        assertEquals(counts, uiState.pendingCounts)
+    }
+
+    @Test
+    fun `updatePendingCounts updates total pendingMessageCount`() {
+        val counts = mapOf(
+            MessageBucket.URGENT to 2,
+            MessageBucket.WORK to 5,
+            MessageBucket.SOCIAL to 3
+        )
+        uiState.updatePendingCounts(counts)
+        assertEquals(10, uiState.pendingMessageCount)
+    }
+
+    @Test
+    fun `bucketsWithPendingMessages returns empty when no pending messages`() {
+        assertEquals(emptyList<MessageBucket>(), uiState.bucketsWithPendingMessages)
+    }
+
+    @Test
+    fun `bucketsWithPendingMessages returns only buckets with count greater than zero`() {
+        val counts = mapOf(
+            MessageBucket.URGENT to 2,
+            MessageBucket.WORK to 0,
+            MessageBucket.SOCIAL to 3
+        )
+        uiState.updatePendingCounts(counts)
+        val result = uiState.bucketsWithPendingMessages
+        assertEquals(2, result.size)
+        assertTrue(result.contains(MessageBucket.URGENT))
+        assertTrue(result.contains(MessageBucket.SOCIAL))
+        assertFalse(result.contains(MessageBucket.WORK))
+    }
+
+    @Test
+    fun `bucketsWithPendingMessages returns buckets sorted by ordinal`() {
+        val counts = mapOf(
+            MessageBucket.SOCIAL to 3,
+            MessageBucket.URGENT to 2,
+            MessageBucket.PROMOTIONAL to 1
+        )
+        uiState.updatePendingCounts(counts)
+        val result = uiState.bucketsWithPendingMessages
+        // URGENT (ordinal 0) should come before SOCIAL (ordinal 2) should come before PROMOTIONAL (ordinal 3)
+        assertEquals(MessageBucket.URGENT, result[0])
+        assertEquals(MessageBucket.SOCIAL, result[1])
+        assertEquals(MessageBucket.PROMOTIONAL, result[2])
+    }
+
+    @Test
+    fun `selectBucket changes between different buckets`() {
+        uiState.selectBucket(MessageBucket.URGENT)
+        assertEquals(MessageBucket.URGENT, uiState.selectedBucket)
+
+        uiState.selectBucket(MessageBucket.SOCIAL)
+        assertEquals(MessageBucket.SOCIAL, uiState.selectedBucket)
+
+        uiState.selectBucket(MessageBucket.WORK)
+        assertEquals(MessageBucket.WORK, uiState.selectedBucket)
+    }
+
+    @Test
+    fun `updatePendingCounts with empty map sets zero pending count`() {
+        uiState.updatePendingCount(10) // First set a count
+        uiState.updatePendingCounts(emptyMap())
+        assertEquals(0, uiState.pendingMessageCount)
+    }
+
+    @Test
+    fun `updatePendingCounts overwrites previous counts`() {
+        val firstCounts = mapOf(MessageBucket.URGENT to 5)
+        val secondCounts = mapOf(MessageBucket.WORK to 3)
+
+        uiState.updatePendingCounts(firstCounts)
+        assertEquals(5, uiState.pendingMessageCount)
+
+        uiState.updatePendingCounts(secondCounts)
+        assertEquals(3, uiState.pendingMessageCount)
+        assertEquals(secondCounts, uiState.pendingCounts)
+    }
 }

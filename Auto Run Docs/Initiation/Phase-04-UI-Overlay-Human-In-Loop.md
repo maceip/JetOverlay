@@ -25,7 +25,7 @@ This phase completes the user-facing experience by enhancing the floating bubble
   - Updated `OverlayUiState.kt` with `processingState`, `pendingMessageCount`, and `currentBucket` properties
   - Created `OverlayUiStateTest.kt` with 29 unit tests covering all new functionality
 
-- [ ] Implement bucket-based message queue UI:
+- [x] Implement bucket-based message queue UI:
   - Update `app/src/main/java/com/yazan/jetoverlay/ui/AgentOverlay.kt`:
     - Show tabs or chips for each bucket with pending messages
     - Allow user to filter by bucket
@@ -34,6 +34,17 @@ This phase completes the user-facing experience by enhancing the floating bubble
     - Add `selectedBucket: MessageBucket?` for filtering
     - Add `pendingCounts: Map<MessageBucket, Int>` for badge counts
   - Implement smooth transition when switching between buckets
+
+  **Completed:** Implemented full bucket-based message queue UI:
+  - Added `selectedBucket: MessageBucket?` and `pendingCounts: Map<MessageBucket, Int>` to `OverlayUiState.kt`
+  - Added `selectBucket()`, `updatePendingCounts()`, and `bucketsWithPendingMessages` property
+  - Updated `AgentOverlay.kt` to compute pending counts per bucket using `derivedStateOf`
+  - Added message filtering by selected bucket with `LaunchedEffect` to update counts
+  - Created `BucketFilterRow` composable with horizontally scrollable bucket chips
+  - Created `BucketChip` composable with count badges, bucket-colored styling, and selection animation
+  - Added smooth `AnimatedContent` transitions when switching between messages
+  - Added 13 new unit tests for bucket filtering functionality (total 42 tests now)
+  - All tests pass successfully
 
 - [ ] Enhance expanded card with response actions:
   - Update FloatingBubble expanded state to show:
