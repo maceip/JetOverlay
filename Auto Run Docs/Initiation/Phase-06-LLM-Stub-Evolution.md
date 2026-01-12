@@ -1,57 +1,29 @@
-Phase 06: LLM Stub Evolution (LiteRT Integration)
-This phase replaces the "Stub" LLM with a real, on-device Large Language Model using Google's LiteRT (formerly TensorFlow Lite) framework. The goal is to replicate the implementation found in the google-ai-edge/gallery repository, enabling privacy-first, offline intelligence. We will move from returning static "hello" strings to generating context-aware responses using the Session API to maintain conversation history per notification thread. While tool usage is not yet active, the architecture will be scaffolded to support Kotlin-based tool calling in the future.
+# Phase 06: LLM Stub Evolution & LiteRT Integration
 
-Tasks
-[ ] Integrate LiteRT dependencies and model management:
+This phase covers both the evolution of the LLM stub into a bucket-aware generator and the integration of a real, on-device Large Language Model using Google's LiteRT (formerly TensorFlow Lite) framework.
 
-Add Gradle dependencies for com.google.ai.edge.litert and GenAI libraries.
+## Part 1: LLM Stub Evolution (Completed)
 
-Create app/src/main/java/com/yazan/jetoverlay/domain/llm/ModelManager.kt:
+This sub-phase evolved the simple LLM stub into a more sophisticated, bucket-aware response generator. Instead of returning a generic "hello" for all messages, the system now generates contextually relevant smart replies based on the message category (Urgent, Work, Social, etc.).
 
-Manage downloading of the .bin / .tflite model files (e.g., Gemma 2 2b or equivalent edge model) to local storage.
+### Tasks
+- [x] **Evolve StubLlmService with bucket-aware responses**: Implemented contextual response generation for each bucket (URGENT, WORK, SOCIAL, etc.).
+- [x] **Update unit tests**: Verified bucket-specific response content and 800ms simulated delay.
+- [x] **Verify integration**: Confirmed `MessageProcessor` correctly applies bucket-to-response mapping.
+- [x] **Manual verification**: Verified response chips in the overlay UI.
 
-Implement a download progress UI in the SettingsScreen created in Phase 05.
+## Part 2: LiteRT Integration (In Progress/Ongoing)
 
-Check for hardware acceleration support (GPU/NPU delegates).
+This sub-phase replaces the stub with a real LLM using LiteRT, enabling privacy-first, offline intelligence.
 
-Constraint: Ensure the app handles the large file size (1GB+) gracefully without blocking the main thread.
+### Roadmap & Status
+- [x] **Integrate LiteRT dependencies**: Added `com.google.ai.edge.litert` and GenAI libraries.
+- [x] **Model Management**: Created `ModelManager.kt` to handle model files (e.g., Gemma 2 2b).
+- [x] **Inference Engine**: Ported `LlmInference` and `Llm` wrappers for token generation.
+- [x] **Session Management**: Implemented `LiteRTClient` and `ToolRegistry` to support future tool calling.
+- [x] **Switch Brain**: Transitioned `MessageProcessor` to prefer `LiteRtLlmService` when available.
 
-[ ] Port Inference Engine from google-ai-edge/gallery:
-
-Create app/src/main/java/com/yazan/jetoverlay/domain/llm/inference/:
-
-Port the LlmInference wrapper class that initializes the engine.
-
-Port the Llm class that handles the token generation loop.
-
-Ensure strict adherence to the reference repo's implementation to leverage their optimization for Android memory limits.
-
-[ ] Implement Session Management (Conversation History):
-
-Create app/src/main/java/com/yazan/jetoverlay/domain/llm/SessionManager.kt:
-
-Maintain a Map<String, LlmSession> where keys are unique notification thread IDs (e.g., pkg_name + conversation_id).
-
-Implement a Least Recently Used (LRU) eviction policy to prevent memory overflows from too many open sessions.
-
-Update LlmService interface to support session-based generation:
-
-suspend fun generateResponse(threadId: String, prompt: String): String
-
-[ ] Scaffold Tool Calling Support:
-
-Create app/src/main/java/com/yazan/jetoverlay/domain/llm/tools/ToolRegistry.kt:
-
-Define the Tool interface exactly as per google-ai-edge specs.
-
-Create a stubbed CalendarTool and TimerTool as placeholders.
-
-Modify the inference loop to recognize "Tool Use" tokens, even if we simply log them for now without executing.
-
-[ ] Switch Brain to Real LLM:
-
-Update MessageProcessor to use the new LiteRtLlmService instead of StubLlmService.
-
-Add a "System Prompt" to the initialization: "You are an anxiety-reducing assistant. Your goal is to summarize notifications calmly and suggest brief, polite responses."
-
-Test on a physical device (Emulator may be too slow/incompatible with GPU delegates).
+### Implementation Notes
+- The system uses the **MediaPipe GenAI Tasks** library for loading `.litertlm` bundles.
+- `LiteRTClient` handles the interaction with the model and maintains conversation context.
+- Future phases will activate Kotlin-based tool calling (Calendar, Timer, etc.).

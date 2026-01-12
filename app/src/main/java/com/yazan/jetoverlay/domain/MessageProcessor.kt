@@ -1,4 +1,4 @@
-package com.yazan.jetoverlay.domain
+﻿package com.yazan.jetoverlay.domain
 
 import com.yazan.jetoverlay.data.Message
 import com.yazan.jetoverlay.data.MessageRepository
@@ -13,13 +13,14 @@ import kotlinx.coroutines.launch
 /**
  * The "Brain" of the system.
  * Observes the Repository for new received messages and 'enriches' them
- * with Veiled content and Smart Replies (simulated LLM).
+ * with Veiled content and Smart Replies.
  */
 class MessageProcessor(
     private val repository: MessageRepository,
     private val categorizer: MessageCategorizer = MessageCategorizer(),
     private val veilGenerator: VeilGenerator = VeilGenerator(),
-    private val llmService: LlmService = StubLlmService()
+    // Now using LiteRTLlmService as default, which falls back to Stub if model missing
+    private val llmService: LlmService = LiteRTLlmService() 
 ) {
     companion object {
         private const val COMPONENT = "MessageProcessor"
@@ -30,6 +31,14 @@ class MessageProcessor(
 
     fun start() {
         Logger.lifecycle(COMPONENT, "start")
+        
+        // Initialize LLM service (loads model if available)
+        scope.launch {
+            if (llmService is LiteRTLlmService) {
+                llmService.initialize()
+            }
+        }
+
         repository.allMessages.onEach { messages ->
             messages.filter { it.status == "RECEIVED" }.forEach { message ->
                 processMessage(message)
@@ -43,13 +52,16 @@ class MessageProcessor(
      */
     fun stop() {
         Logger.lifecycle(COMPONENT, "stop")
+        if (llmService is LiteRTLlmService) {
+            llmService.close()
+        }
         supervisorJob.cancel()
     }
 
     private fun processMessage(message: Message) {
         scope.launch {
             try {
-                Logger.processing(COMPONENT, "Starting processing from ${message.senderName}", message.id)
+                Logger.processing(COMPONENT, "Starting processing from ${message.senderName}", message.id)       
 
                 // 1. Categorize message -> set bucket
                 val bucket = categorizer.categorize(message)
