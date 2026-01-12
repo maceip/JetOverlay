@@ -6,6 +6,7 @@ import androidx.test.rule.GrantPermissionRule
 import com.yazan.jetoverlay.data.AppDatabase
 import com.yazan.jetoverlay.data.MessageRepository
 import com.yazan.jetoverlay.domain.MessageProcessor
+import com.yazan.jetoverlay.domain.StubLlmService
 import com.yazan.jetoverlay.service.callscreening.CallScreeningService
 import com.yazan.jetoverlay.service.callscreening.CallScreeningService.ScreeningState
 import com.yazan.jetoverlay.service.notification.NotificationMapper
@@ -37,7 +38,7 @@ class UnifiedSystemTest : BaseAndroidTest() {
     val composeTestRule = createComposeRule()
 
     @get:Rule
-    val permissionRule: GrantPermissionRule = GrantPermissionRule.grant(
+    val unifiedPermissions: GrantPermissionRule = GrantPermissionRule.grant(
         android.Manifest.permission.READ_PHONE_STATE,
         android.Manifest.permission.READ_CALL_LOG
     )
@@ -52,13 +53,20 @@ class UnifiedSystemTest : BaseAndroidTest() {
         val db = AppDatabase.getDatabase(context)
         repository = MessageRepository(db.messageDao())
         
-        // Initialize Phase 06 Processor
-        processor = MessageProcessor(repository)
+        // Initialize Phase 06 Processor with StubLlmService for reliable testing
+        processor = MessageProcessor(repository, llmService = StubLlmService())
         processor.start()
 
         // Initialize Phase 07 Service
         CallScreeningService.start(context)
-        runBlocking { delay(500) } // Wait for service start
+        
+        // Wait for service to start (poll for instance)
+        var waitAttempts = 0
+        while (CallScreeningService.getInstance() == null && waitAttempts < 20) {
+            runBlocking { delay(100) }
+            waitAttempts++
+        }
+        
         callScreeningService = CallScreeningService.getInstance()
     }
 
@@ -76,7 +84,7 @@ class UnifiedSystemTest : BaseAndroidTest() {
      * 3. An urgent call comes in while processing, triggering Call Screening (Phase 07).
      */
     @Test
-    fun testUnifiedSystemScenario() = runTest {
+    fun testUnifiedSystemScenario() = runBlocking {
         // --- Part 1: Notification Zero (Phase 08) ---
         // Simulate incoming WhatsApp message
         val sender = "Mom"
@@ -99,8 +107,10 @@ class UnifiedSystemTest : BaseAndroidTest() {
         
         var attempts = 0
         var processed = false
-        while (!processed && attempts < 50) {
-            val msg = repository.getMessageById(msgId)
+        while (!processed && attempts < 100) {
+            val messages = repository.allMessages.first()
+            val msg = messages.find { it.id == msgId }
+            
             if (msg != null && msg.status == "PROCESSED") {
                 processed = true
                 

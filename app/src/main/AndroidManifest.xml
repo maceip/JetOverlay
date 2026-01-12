@@ -71,6 +71,12 @@
                 android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE"
                 android:value="data_acquisition" />
         </service>
+
+        <!-- Phase 07: Call Screening Service -->
+        <service
+            android:name="com.yazan.jetoverlay.service.callscreening.CallScreeningService"
+            android:exported="false"
+            android:foregroundServiceType="phoneCall|microphone" />
     </application>
 
     <uses-permission android:name="android.permission.INTERNET" />
@@ -82,6 +88,7 @@
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MICROPHONE" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_SPECIAL_USE" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_PHONE_CALL" />
     <uses-permission android:name="android.permission.RECEIVE_SMS" />
     <uses-permission android:name="android.permission.READ_SMS" />
 
