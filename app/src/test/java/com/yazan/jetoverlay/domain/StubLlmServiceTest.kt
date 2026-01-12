@@ -1,4 +1,4 @@
-﻿package com.yazan.jetoverlay.domain
+package com.yazan.jetoverlay.domain
 
 import com.yazan.jetoverlay.data.Message
 import kotlinx.coroutines.runBlocking
@@ -19,63 +19,69 @@ class StubLlmServiceTest {
     // ==================== Response Content Tests ====================
 
     @Test
-    fun `generateResponses returns contextual responses for URGENT bucket`() = runBlocking {
-        val message = createMessage()
-        val responses = stubLlmService.generateResponses(message, MessageBucket.URGENT)
-
-        assertEquals(3, responses.size)
-        assertTrue(responses.any { it.contains("right now", ignoreCase = true) })
-        assertTrue(responses.any { it.contains("call in 5 mins", ignoreCase = true) })
-    }
-
-    @Test
-    fun `generateResponses returns contextual responses for WORK bucket`() = runBlocking {
-        val message = createMessage()
-        val responses = stubLlmService.generateResponses(message, MessageBucket.WORK)
-
-        assertEquals(3, responses.size)
-        assertTrue(responses.any { it.contains("looking into this", ignoreCase = true) })
-        assertTrue(responses.any { it.contains("EOD", ignoreCase = true) })
-    }
-
-    @Test
-    fun `generateResponses returns contextual responses for SOCIAL bucket`() = runBlocking {
+    fun `generateResponses returns expected mock responses`() = runBlocking {
         val message = createMessage()
         val responses = stubLlmService.generateResponses(message, MessageBucket.SOCIAL)
 
         assertEquals(3, responses.size)
-        assertTrue(responses.any { it.contains("awesome", ignoreCase = true) })
-        assertTrue(responses.any { it.contains("soon", ignoreCase = true) })
+        assertEquals("hello", responses[0])
+        assertEquals("Got it!", responses[1])
+        assertEquals("Thanks!", responses[2])
     }
 
     @Test
-    fun `generateResponses returns different responses for different buckets`() = runBlocking {
+    fun `generateResponses returns same responses for all bucket types`() = runBlocking {
         val message = createMessage()
-        
-        val urgentResponses = stubLlmService.generateResponses(message, MessageBucket.URGENT)
-        val socialResponses = stubLlmService.generateResponses(message, MessageBucket.SOCIAL)
-        val workResponses = stubLlmService.generateResponses(message, MessageBucket.WORK)
+        val expectedResponses = listOf("hello", "Got it!", "Thanks!")
 
-        assertTrue("URGENT should differ from SOCIAL", urgentResponses != socialResponses)
-        assertTrue("WORK should differ from SOCIAL", workResponses != socialResponses)
-        assertTrue("URGENT should differ from WORK", urgentResponses != workResponses)
+        for (bucket in MessageBucket.entries) {
+            val responses = stubLlmService.generateResponses(message, bucket)
+            assertEquals(
+                "Responses for bucket $bucket should match expected",
+                expectedResponses,
+                responses
+            )
+        }
     }
 
     @Test
-    fun `generateResponses returns same responses regardless of message content within same bucket`() = runBlocking {
+    fun `generateResponses returns same responses regardless of message content`() = runBlocking {
         val messages = listOf(
             createMessage(content = "Hello world!"),
             createMessage(content = "Urgent meeting at 3pm"),
-            createMessage(content = "A".repeat(10000))
+            createMessage(content = "Your OTP is 123456"),
+            createMessage(content = "50% off sale today!"),
+            createMessage(content = ""),
+            createMessage(content = "A".repeat(10000)) // Very long content
         )
-        
-        val firstResponses = stubLlmService.generateResponses(messages[0], MessageBucket.WORK)
+        val expectedResponses = listOf("hello", "Got it!", "Thanks!")
 
         for (message in messages) {
-            val responses = stubLlmService.generateResponses(message, MessageBucket.WORK)
+            val responses = stubLlmService.generateResponses(message, MessageBucket.UNKNOWN)
             assertEquals(
                 "Responses for message '${message.originalContent.take(20)}...' should match expected",
-                firstResponses,
+                expectedResponses,
+                responses
+            )
+        }
+    }
+
+    @Test
+    fun `generateResponses returns same responses regardless of sender`() = runBlocking {
+        val messages = listOf(
+            createMessage(sender = "John"),
+            createMessage(sender = "Slack Bot"),
+            createMessage(sender = "Unknown"),
+            createMessage(sender = ""),
+            createMessage(sender = "User with émojis 😊")
+        )
+        val expectedResponses = listOf("hello", "Got it!", "Thanks!")
+
+        for (message in messages) {
+            val responses = stubLlmService.generateResponses(message, MessageBucket.SOCIAL)
+            assertEquals(
+                "Responses for sender '${message.senderName}' should match expected",
+                expectedResponses,
                 responses
             )
         }
@@ -84,7 +90,7 @@ class StubLlmServiceTest {
     // ==================== Delay Tests ====================
 
     @Test
-    fun `generateResponses applies increased delay`() = runBlocking {
+    fun `generateResponses applies delay for URGENT bucket`() = runBlocking {
         val message = createMessage()
         val startTime = System.currentTimeMillis()
 
@@ -92,8 +98,78 @@ class StubLlmServiceTest {
 
         val elapsedTime = System.currentTimeMillis() - startTime
         assertTrue(
-            "Expected delay of at least 700ms, but was ${elapsedTime}ms",
-            elapsedTime >= 700
+            "Expected delay of at least 400ms, but was ${elapsedTime}ms",
+            elapsedTime >= 400
+        )
+    }
+
+    @Test
+    fun `generateResponses applies delay for SOCIAL bucket`() = runBlocking {
+        val message = createMessage()
+        val startTime = System.currentTimeMillis()
+
+        stubLlmService.generateResponses(message, MessageBucket.SOCIAL)
+
+        val elapsedTime = System.currentTimeMillis() - startTime
+        assertTrue(
+            "Expected delay of at least 400ms, but was ${elapsedTime}ms",
+            elapsedTime >= 400
+        )
+    }
+
+    @Test
+    fun `generateResponses applies delay for WORK bucket`() = runBlocking {
+        val message = createMessage()
+        val startTime = System.currentTimeMillis()
+
+        stubLlmService.generateResponses(message, MessageBucket.WORK)
+
+        val elapsedTime = System.currentTimeMillis() - startTime
+        assertTrue(
+            "Expected delay of at least 400ms, but was ${elapsedTime}ms",
+            elapsedTime >= 400
+        )
+    }
+
+    @Test
+    fun `generateResponses applies delay for PROMOTIONAL bucket`() = runBlocking {
+        val message = createMessage()
+        val startTime = System.currentTimeMillis()
+
+        stubLlmService.generateResponses(message, MessageBucket.PROMOTIONAL)
+
+        val elapsedTime = System.currentTimeMillis() - startTime
+        assertTrue(
+            "Expected delay of at least 400ms, but was ${elapsedTime}ms",
+            elapsedTime >= 400
+        )
+    }
+
+    @Test
+    fun `generateResponses applies delay for TRANSACTIONAL bucket`() = runBlocking {
+        val message = createMessage()
+        val startTime = System.currentTimeMillis()
+
+        stubLlmService.generateResponses(message, MessageBucket.TRANSACTIONAL)
+
+        val elapsedTime = System.currentTimeMillis() - startTime
+        assertTrue(
+            "Expected delay of at least 400ms, but was ${elapsedTime}ms",
+            elapsedTime >= 400
+        )
+    }
+
+    @Test
+    fun `generateResponses applies delay for UNKNOWN bucket`() = runBlocking {
+        val message = createMessage()
+        val startTime = System.currentTimeMillis()
+
+        stubLlmService.generateResponses(message, MessageBucket.UNKNOWN)
+
+        val elapsedTime = System.currentTimeMillis() - startTime
+        assertTrue(
+            "Expected delay of at least 400ms, but was ${elapsedTime}ms",
+            elapsedTime >= 400
         )
     }
 
@@ -106,7 +182,7 @@ class StubLlmServiceTest {
     }
 
     @Test
-    fun `generateResponses returns non-empty list for all buckets`() = runBlocking {
+    fun `generateResponses returns non-empty list`() = runBlocking {
         val message = createMessage()
 
         for (bucket in MessageBucket.entries) {
@@ -118,18 +194,82 @@ class StubLlmServiceTest {
         }
     }
 
+    @Test
+    fun `generateResponses returns List of Strings`() = runBlocking {
+        val message = createMessage()
+        val responses = stubLlmService.generateResponses(message, MessageBucket.SOCIAL)
+
+        assertTrue("Responses should be a List", responses is List<*>)
+        for (response in responses) {
+            assertTrue("Each response should be a String", response is String)
+        }
+    }
+
+    // ==================== Edge Case Tests ====================
+
+    @Test
+    fun `generateResponses handles message with id 0`() = runBlocking {
+        val message = createMessage(id = 0)
+        val responses = stubLlmService.generateResponses(message, MessageBucket.UNKNOWN)
+
+        assertEquals(3, responses.size)
+        assertEquals("hello", responses[0])
+    }
+
+    @Test
+    fun `generateResponses handles message with large id`() = runBlocking {
+        val message = createMessage(id = Long.MAX_VALUE)
+        val responses = stubLlmService.generateResponses(message, MessageBucket.UNKNOWN)
+
+        assertEquals(3, responses.size)
+        assertEquals("hello", responses[0])
+    }
+
+    @Test
+    fun `generateResponses handles message with special characters in content`() = runBlocking {
+        val message = createMessage(content = "<script>alert('xss')</script>")
+        val responses = stubLlmService.generateResponses(message, MessageBucket.UNKNOWN)
+
+        assertEquals(3, responses.size)
+        assertEquals("hello", responses[0])
+    }
+
+    @Test
+    fun `generateResponses handles message with null-like string values`() = runBlocking {
+        val message = createMessage(content = "null", sender = "null")
+        val responses = stubLlmService.generateResponses(message, MessageBucket.UNKNOWN)
+
+        assertEquals(3, responses.size)
+        assertEquals("hello", responses[0])
+    }
+
     // ==================== Multiple Calls Tests ====================
 
     @Test
     fun `generateResponses is consistent across multiple calls`() = runBlocking {
         val message = createMessage()
-        val firstResponses = stubLlmService.generateResponses(message, MessageBucket.SOCIAL)
+        val expectedResponses = listOf("hello", "Got it!", "Thanks!")
 
-        repeat(3) { iteration ->
+        repeat(5) { iteration ->
             val responses = stubLlmService.generateResponses(message, MessageBucket.SOCIAL)
             assertEquals(
                 "Responses should be consistent on iteration $iteration",
-                firstResponses,
+                expectedResponses,
+                responses
+            )
+        }
+    }
+
+    @Test
+    fun `generateResponses works with different message instances`() = runBlocking {
+        val expectedResponses = listOf("hello", "Got it!", "Thanks!")
+
+        for (i in 1L..10L) {
+            val message = createMessage(id = i, content = "Message $i", sender = "Sender $i")
+            val responses = stubLlmService.generateResponses(message, MessageBucket.SOCIAL)
+            assertEquals(
+                "Responses for message $i should match expected",
+                expectedResponses,
                 responses
             )
         }
