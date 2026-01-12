@@ -6,7 +6,6 @@ import androidx.test.rule.GrantPermissionRule
 import com.yazan.jetoverlay.data.AppDatabase
 import com.yazan.jetoverlay.data.MessageRepository
 import com.yazan.jetoverlay.domain.MessageProcessor
-import com.yazan.jetoverlay.domain.StubLlmService
 import com.yazan.jetoverlay.service.callscreening.CallScreeningService
 import com.yazan.jetoverlay.service.callscreening.CallScreeningService.ScreeningState
 import com.yazan.jetoverlay.service.notification.NotificationMapper
@@ -53,8 +52,8 @@ class UnifiedSystemTest : BaseAndroidTest() {
         val db = AppDatabase.getDatabase(context)
         repository = MessageRepository(db.messageDao())
         
-        // Initialize Phase 06 Processor with StubLlmService for reliable testing
-        processor = MessageProcessor(repository, llmService = StubLlmService())
+        // Initialize Phase 06 Processor (now uses real LiteRTLlmService by default)
+        processor = MessageProcessor(repository)
         processor.start()
 
         // Initialize Phase 07 Service
@@ -107,7 +106,7 @@ class UnifiedSystemTest : BaseAndroidTest() {
         
         var attempts = 0
         var processed = false
-        while (!processed && attempts < 100) {
+        while (!processed && attempts < 300) {
             val messages = repository.allMessages.first()
             val msg = messages.find { it.id == msgId }
             
