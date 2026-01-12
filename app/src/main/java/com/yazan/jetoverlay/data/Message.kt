@@ -19,7 +19,8 @@ data class Message(
     val selectedResponse: String? = null,
     val status: String = "RECEIVED",
     val bucket: String = "UNKNOWN",
-    val timestamp: Long = System.currentTimeMillis()
+    val timestamp: Long = System.currentTimeMillis(),
+    val contextTag: String? = null  // personal, work, social, email, other
 )
 
 class Converters {

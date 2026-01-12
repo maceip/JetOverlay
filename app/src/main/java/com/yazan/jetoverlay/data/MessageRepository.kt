@@ -12,12 +12,18 @@ class MessageRepository(private val messageDao: MessageDao) {
         messageDao.updateBucket(messageId, bucket)
     }
 
-    suspend fun ingestNotification(packageName: String, sender: String, content: String): Long {
+    suspend fun ingestNotification(
+        packageName: String,
+        sender: String,
+        content: String,
+        contextTag: String? = null
+    ): Long {
         val message = Message(
             packageName = packageName,
             senderName = sender,
             originalContent = content,
-            status = "RECEIVED"
+            status = "RECEIVED",
+            contextTag = contextTag
         )
         return messageDao.insert(message)
     }

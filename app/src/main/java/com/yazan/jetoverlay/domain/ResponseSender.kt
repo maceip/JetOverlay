@@ -1,20 +1,29 @@
 package com.yazan.jetoverlay.domain
 
-import android.app.Notification
 import android.app.PendingIntent
 import android.content.Context
 import android.content.Intent
-import android.os.Build
 import android.os.Bundle
+import android.service.notification.NotificationListenerService
 import androidx.core.app.RemoteInput
 import com.yazan.jetoverlay.data.ReplyActionCache
+import com.yazan.jetoverlay.util.Logger
 
 /**
  * Handles sending responses via the original notification's reply action.
  * Uses ReplyActionCache to retrieve the PendingIntent and constructs
  * RemoteInput with the response text.
+ *
+ * Supports:
+ * - Sending replies via RemoteInput (WhatsApp, Signal, Slack, etc.)
+ * - Marking messages as read
+ * - Clearing notifications from status bar
  */
 class ResponseSender(private val context: Context) {
+
+    companion object {
+        private const val COMPONENT = "ResponseSender"
+    }
 
     /**
      * Result of a send operation.
@@ -29,9 +38,16 @@ class ResponseSender(private val context: Context) {
      *
      * @param messageId The ID of the message to respond to
      * @param responseText The response text to send
+     * @param markAsRead Whether to also fire the mark-as-read action (default: true)
      * @return SendResult indicating success or failure with error message
      */
-    fun sendResponse(messageId: Long, responseText: String): SendResult {
+    fun sendResponse(
+        messageId: Long,
+        responseText: String,
+        markAsRead: Boolean = true
+    ): SendResult {
+        Logger.d(COMPONENT, "Sending response for message $messageId")
+
         // Validate input
         if (responseText.isBlank()) {
             return SendResult.Error("Response text cannot be empty")
@@ -53,19 +69,67 @@ class ResponseSender(private val context: Context) {
 
         return try {
             // Build the reply intent with RemoteInput data
-            val replyIntent = buildReplyIntent(replyAction.actionIntent, resultKey, responseText)
+            val replyIntent = buildReplyIntent(resultKey, responseText)
 
             // Fire the PendingIntent with the reply data
             replyAction.actionIntent.send(context, 0, replyIntent)
+            Logger.d(COMPONENT, "Reply sent successfully for message $messageId")
+
+            // Optionally mark as read
+            if (markAsRead) {
+                markMessageAsRead(messageId)
+            }
 
             // Clean up the cached action after successful send
             ReplyActionCache.remove(messageId)
 
             SendResult.Success
         } catch (e: PendingIntent.CanceledException) {
+            Logger.e(COMPONENT, "Reply action was cancelled", e)
             SendResult.Error("Reply action was cancelled: ${e.message}")
         } catch (e: Exception) {
+            Logger.e(COMPONENT, "Failed to send response", e)
             SendResult.Error("Failed to send response: ${e.message}")
+        }
+    }
+
+    /**
+     * Marks a message as read by firing the mark-as-read action if available.
+     *
+     * @param messageId The ID of the message to mark as read
+     * @return SendResult indicating success or failure
+     */
+    fun markMessageAsRead(messageId: Long): SendResult {
+        val markAsReadAction = ReplyActionCache.getMarkAsRead(messageId)
+
+        return if (markAsReadAction != null) {
+            try {
+                markAsReadAction.actionIntent.send()
+                Logger.d(COMPONENT, "Marked message $messageId as read")
+                SendResult.Success
+            } catch (e: PendingIntent.CanceledException) {
+                Logger.w(COMPONENT, "Mark-as-read action was cancelled for message $messageId")
+                SendResult.Error("Mark-as-read action was cancelled")
+            } catch (e: Exception) {
+                Logger.e(COMPONENT, "Failed to mark message as read", e)
+                SendResult.Error("Failed to mark as read: ${e.message}")
+            }
+        } else {
+            Logger.d(COMPONENT, "No mark-as-read action available for message $messageId")
+            SendResult.Success // Not an error, just not available
+        }
+    }
+
+    /**
+     * Sends responses to multiple messages in batch.
+     *
+     * @param responses Map of messageId to response text
+     * @return Map of messageId to SendResult
+     */
+    fun sendBatchResponses(responses: Map<Long, String>): Map<Long, SendResult> {
+        Logger.d(COMPONENT, "Sending batch responses for ${responses.size} messages")
+        return responses.mapValues { (messageId, responseText) ->
+            sendResponse(messageId, responseText)
         }
     }
 
@@ -73,7 +137,6 @@ class ResponseSender(private val context: Context) {
      * Builds the reply intent with RemoteInput data attached.
      */
     private fun buildReplyIntent(
-        actionIntent: PendingIntent,
         resultKey: String,
         responseText: String
     ): Intent {
@@ -104,7 +167,7 @@ class ResponseSender(private val context: Context) {
      * @return true if a reply action is cached, false otherwise
      */
     fun hasReplyAction(messageId: Long): Boolean {
-        return ReplyActionCache.get(messageId) != null
+        return ReplyActionCache.hasReplyAction(messageId)
     }
 
     /**
@@ -117,5 +180,19 @@ class ResponseSender(private val context: Context) {
     fun getRemoteInputKey(messageId: Long): String? {
         val action = ReplyActionCache.get(messageId) ?: return null
         return action.remoteInputs?.firstOrNull()?.resultKey
+    }
+
+    /**
+     * Gets the count of available reply actions.
+     */
+    fun getAvailableReplyCount(): Int {
+        return ReplyActionCache.replyActionCount()
+    }
+
+    /**
+     * Gets all message IDs that have cached reply actions.
+     */
+    fun getReplyableMessageIds(): Set<Long> {
+        return ReplyActionCache.getAllMessageIds()
     }
 }

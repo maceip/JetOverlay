@@ -1,21 +1,32 @@
 package com.yazan.jetoverlay.service
 
-import com.yazan.jetoverlay.data.AppDatabase
 import android.service.notification.NotificationListenerService
 import android.service.notification.StatusBarNotification
+import com.yazan.jetoverlay.JetOverlayApplication
 import com.yazan.jetoverlay.data.MessageRepository
 import com.yazan.jetoverlay.data.NotificationConfigManager
 import com.yazan.jetoverlay.data.ReplyActionCache
 import com.yazan.jetoverlay.domain.MessageProcessor
 import com.yazan.jetoverlay.service.notification.MessageNotificationFilter
 import com.yazan.jetoverlay.service.notification.NotificationMapper
+import com.yazan.jetoverlay.util.Logger
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.launch
-import com.yazan.jetoverlay.JetOverlayApplication
 
+/**
+ * NotificationListenerService that intercepts notifications from messaging apps.
+ *
+ * Extracts message content and reply actions from notifications, caching them
+ * for later use by ResponseSender. Supports all major messaging platforms
+ * via NotificationMapper's app-specific extraction logic.
+ */
 class AppNotificationListenerService : NotificationListenerService() {
+
+    companion object {
+        private const val COMPONENT = "NotificationListener"
+    }
 
     private val scope = CoroutineScope(Dispatchers.IO + SupervisorJob())
     private lateinit var repository: MessageRepository
@@ -25,8 +36,9 @@ class AppNotificationListenerService : NotificationListenerService() {
 
     override fun onCreate() {
         super.onCreate()
+        Logger.lifecycle(COMPONENT, "onCreate")
         repository = JetOverlayApplication.instance.repository
-        
+
         // Start the Intelligence Layer
         processor = MessageProcessor(repository)
         processor.start()
@@ -38,44 +50,61 @@ class AppNotificationListenerService : NotificationListenerService() {
         val notification: StatusBarNotification = sbn
         val packageName = sbn.packageName
 
-        android.util.Log.d("JetOverlayDebug", "DEBUG: Notification posted: pkg=$packageName, id=${sbn.id}, ongoing=${sbn.isOngoing}")
+        Logger.d(COMPONENT, "Notification posted: pkg=$packageName, id=${sbn.id}, ongoing=${sbn.isOngoing}")
 
         // Check configuration for this app
         val config = NotificationConfigManager.getConfig(packageName)
 
         if (!config.shouldVeil) {
-            android.util.Log.d("JetOverlayDebug", "DEBUG: Veiling disabled for $packageName, passing through")
+            Logger.d(COMPONENT, "Veiling disabled for $packageName, passing through")
             return
         }
 
         if (filter.shouldProcess(notification)) {
-            android.util.Log.d("JetOverlayDebug", "DEBUG: Filter PASSED for $packageName")
+            Logger.d(COMPONENT, "Filter PASSED for $packageName")
+
+            // Check if this is a replyable app for enhanced extraction
+            val isReplyable = mapper.isReplyableApp(packageName)
+            val context = mapper.getContextCategory(packageName)
+            Logger.d(COMPONENT, "App context: $context, replyable: $isReplyable")
+
             mapper.map(notification)?.let { message ->
                 scope.launch {
                     val id = repository.ingestNotification(
                         packageName = message.packageName,
                         sender = message.senderName,
-                        content = message.originalContent
+                        content = message.originalContent,
+                        contextTag = message.contextTag
                     )
-                    android.util.Log.d("JetOverlayDebug", "DEBUG: Ingested message ID=$id. Content='${message.originalContent}'")
+                    Logger.processing(COMPONENT, "Ingested message", id)
 
-                    // Extract and Cache Reply Action
-                    val replyAction = findReplyAction(notification.notification)
-                    if (replyAction != null) {
-                        ReplyActionCache.save(id, replyAction)
-                        android.util.Log.d("JetOverlayDebug", "DEBUG: Reply action cached.")
+                    // Extract and cache reply action using enhanced mapper
+                    val replyInfo = mapper.extractReplyAction(notification.notification)
+                    if (replyInfo != null) {
+                        ReplyActionCache.save(id, replyInfo.action)
+                        Logger.d(COMPONENT, "Reply action cached (key: ${replyInfo.resultKey}, label: ${replyInfo.label})")
                     } else {
-                        android.util.Log.d("JetOverlayDebug", "DEBUG: No reply action found.")
+                        Logger.d(COMPONENT, "No reply action found for $packageName")
                     }
+
+                    // Extract and cache mark-as-read action
+                    val markAsReadAction = mapper.extractMarkAsReadAction(notification.notification)
+                    if (markAsReadAction != null) {
+                        ReplyActionCache.saveMarkAsRead(id, markAsReadAction)
+                        Logger.d(COMPONENT, "Mark-as-read action cached")
+                    }
+
+                    // Save notification key for later cancellation
+                    ReplyActionCache.saveNotificationKey(id, sbn.key)
 
                     // Cancel (hide) the notification if configured to do so
                     if (config.shouldCancel) {
                         launch(Dispatchers.Main) {
                             try {
                                 cancelNotification(sbn.key)
-                                android.util.Log.d("JetOverlayDebug", "DEBUG: Notification cancelled for $packageName")
+                                Logger.d(COMPONENT, "Notification cancelled for $packageName")
                             } catch (e: Exception) {
-                                android.util.Log.e("JetOverlayDebug", "DEBUG: Failed to cancel notification: ${e.message}")
+                                Logger.e(COMPONENT, "Failed to cancel notification", e)
                             }
                         }
                     }
@@ -83,7 +112,7 @@ class AppNotificationListenerService : NotificationListenerService() {
                     // AUTO-TRIGGER: Wake up the overlay
                     launch(Dispatchers.Main) {
                         if (!com.yazan.jetoverlay.api.OverlaySdk.isOverlayActive("agent_bubble")) {
-                            android.util.Log.d("JetOverlayDebug", "DEBUG: Triggering OverlaySdk.show()")
+                            Logger.d(COMPONENT, "Triggering OverlaySdk.show()")
                             com.yazan.jetoverlay.api.OverlaySdk.show(
                                 context = applicationContext,
                                 config = com.yazan.jetoverlay.api.OverlayConfig(
@@ -94,28 +123,19 @@ class AppNotificationListenerService : NotificationListenerService() {
                                 )
                             )
                         } else {
-                            android.util.Log.d("JetOverlayDebug", "DEBUG: Overlay already active.")
+                            Logger.d(COMPONENT, "Overlay already active")
                         }
                     }
                 }
             }
         } else {
-            android.util.Log.d("JetOverlayDebug", "DEBUG: Filter REJECTED for $packageName")
+            Logger.d(COMPONENT, "Filter REJECTED for $packageName")
         }
-    }
-    
-    private fun findReplyAction(notification: android.app.Notification): android.app.Notification.Action? {
-        notification.actions?.forEach { action ->
-            if (action.remoteInputs != null && action.remoteInputs.isNotEmpty()) {
-                // Heuristic: Actions with remote input are usually reply actions
-                return action
-            }
-        }
-        return null
     }
 
     override fun onDestroy() {
         super.onDestroy()
+        Logger.lifecycle(COMPONENT, "onDestroy")
         ReplyActionCache.clear()
     }
 }

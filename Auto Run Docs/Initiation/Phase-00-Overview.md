@@ -13,6 +13,9 @@ ssh-jet (JetOverlay) is an Android overlay application that intercepts notificat
 | 03 | Core Logic - Veiling, Bucketing & LLM Stub | Implement message categorization, veil generation, and stubbed LLM responses |
 | 04 | UI Overlay Polish & Human-in-the-Loop | Complete overlay UX with status indicators, response editing, send/dismiss flows |
 | 05 | Integration Polish & Production Readiness | Permission onboarding, settings, battery optimization, first-run experience |
+| 06 | LLM Stub Evolution | full integration with on-device llm framework LiteRT-LM |
+| 07 | Screening Calls | create an android  service that picks up all calls and can respond with a human  voice  using on device llm|
+| 08 | Notification Zero  | email, slack, linear, text message, signal, instagram, whatsapp, any android app all working through our system |
 
 ## Key Constraints
 
