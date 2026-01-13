@@ -78,7 +78,7 @@ class JetOverlayApplication : Application() {
             // Note: The service handles connected integrations that need immediate polling
             // Skip service startup during instrumentation tests to avoid ForegroundServiceStartNotAllowedException
             if (!isRunningInstrumentationTest()) {
-                startDataAcquisitionService()
+                // startDataAcquisitionService() // Removed to prevent ForegroundServiceStartNotAllowedException on background start
                 // Also schedule battery-efficient periodic sync via WorkManager
                 scheduleIntegrationSync()
             } else {

@@ -2,6 +2,7 @@ package com.yazan.jetoverlay.ui
 
 import android.content.Context
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -15,6 +16,7 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.Call
 import androidx.compose.material.icons.filled.Email
 import androidx.compose.material.icons.filled.Notifications
 import androidx.compose.material.icons.filled.Refresh
@@ -43,7 +45,10 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.lifecycle.compose.LifecycleResumeEffect
 import com.yazan.jetoverlay.util.Logger
+import com.yazan.jetoverlay.util.PermissionManager
+import com.yazan.jetoverlay.util.PermissionManager.RequiredPermission
 
 /**
  * Settings manager for persisting user preferences.
@@ -168,12 +173,24 @@ fun SettingsScreen(
     modifier: Modifier = Modifier
 ) {
     val context = LocalContext.current
+    val permissionManager = remember { PermissionManager(context) }
 
     // Integration states
     var slackEnabled by remember { mutableStateOf(SettingsManager.isSlackEnabled(context)) }
     var emailEnabled by remember { mutableStateOf(SettingsManager.isEmailEnabled(context)) }
     var notionEnabled by remember { mutableStateOf(SettingsManager.isNotionEnabled(context)) }
     var githubEnabled by remember { mutableStateOf(SettingsManager.isGitHubEnabled(context)) }
+
+    // Permission states
+    var callScreeningGranted by remember { 
+        mutableStateOf(permissionManager.isPermissionGranted(RequiredPermission.CALL_SCREENING)) 
+    }
+
+    // Refresh permission status on resume
+    LifecycleResumeEffect(Unit) {
+        callScreeningGranted = permissionManager.isPermissionGranted(RequiredPermission.CALL_SCREENING)
+        onPauseOrDispose { }
+    }
 
     // Notification states
     var cancelNotifications by remember { mutableStateOf(SettingsManager.isCancelNotificationsEnabled(context)) }
@@ -207,6 +224,33 @@ fun SettingsScreen(
                 .padding(paddingValues)
                 .verticalScroll(rememberScrollState())
         ) {
+            // Permissions Section
+            SettingsSection(title = "Permissions & Features") {
+                SettingsClickableItem(
+                    title = "Call Screening",
+                    description = if (callScreeningGranted) "Active - Protecting against spam" else "Inactive - Tap to enable",
+                    icon = Icons.Default.Call,
+                    onClick = {
+                        val intent = permissionManager.getCallScreeningRoleIntent()
+                        if (intent != null) {
+                            context.startActivity(intent)
+                        } else {
+                            context.startActivity(permissionManager.getAppSettingsIntent())
+                        }
+                    },
+                    trailingContent = {
+                        Text(
+                            text = if (callScreeningGranted) "ENABLED" else "DISABLED",
+                            style = MaterialTheme.typography.labelMedium,
+                            fontWeight = FontWeight.Bold,
+                            color = if (callScreeningGranted) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.error
+                        )
+                    }
+                )
+            }
+
+            Spacer(modifier = Modifier.height(16.dp))
+
             // Integrations Section
             SettingsSection(title = "Integrations") {
                 SettingsToggleItem(
@@ -393,6 +437,7 @@ private fun SettingsClickableItem(
     description: String,
     icon: ImageVector,
     onClick: () -> Unit,
+    trailingContent: (@Composable () -> Unit)? = null,
     modifier: Modifier = Modifier
 ) {
     Row(
@@ -421,6 +466,9 @@ private fun SettingsClickableItem(
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
+        }
+        if (trailingContent != null) {
+            trailingContent()
         }
     }
 }

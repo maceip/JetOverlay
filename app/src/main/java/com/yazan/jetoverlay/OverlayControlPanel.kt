@@ -120,27 +120,26 @@ fun OverlayControlPanel(modifier: Modifier = Modifier) {
     // --- AUTO-REFRESH LOGIC (LifecycleResumeEffect) ---
     LifecycleResumeEffect(Unit) {
         // Re-check all permissions on resume (user may have changed in Settings)
-        val wasGranted = allRequiredPermissionsGranted
         allRequiredPermissionsGranted = permissionManager.areAllRequiredPermissionsGranted()
-
-        // Re-check onboarding status
         onboardingComplete.value = OnboardingManager.isOnboardingComplete(context)
-
-        // Update persistent storage
         permissionManager.updateAllPermissionStatuses()
-
-        // Log if permission status changed
-        if (wasGranted != allRequiredPermissionsGranted) {
-            Logger.i("OverlayControlPanel", "Permission status changed: $wasGranted -> $allRequiredPermissionsGranted")
-        }
-
         onPauseOrDispose { }
     }
 
     // --- AUTO-SHOW ON LAUNCH ---
-    // If we have all required permissions and onboarding is complete, show the agent bubble.
+    val lifecycleOwner = androidx.lifecycle.compose.LocalLifecycleOwner.current
     LaunchedEffect(currentState) {
         if (currentState == ControlPanelState.MAIN_PANEL) {
+            // Start the DataAcquisitionService when the UI is visible.
+            // This is safe because the app is in the foreground.
+            if (lifecycleOwner.lifecycle.currentState.isAtLeast(androidx.lifecycle.Lifecycle.State.STARTED)) {
+                try {
+                    JetOverlayApplication.instance.startDataAcquisitionService()
+                } catch (e: Exception) {
+                    Logger.e("OverlayControlPanel", "Failed to start DataAcquisitionService", e)
+                }
+            }
+            
             if (!OverlaySdk.isOverlayActive("agent_bubble")) {
                 Logger.uiState("OverlayControlPanel", "Auto-showing agent bubble")
                 OverlaySdk.show(
@@ -156,18 +155,17 @@ fun OverlayControlPanel(modifier: Modifier = Modifier) {
         }
     }
 
-    // Main content with animated transition between states
+    // Main content with animated transition between states (Full Screen)
     AnimatedContent(
         targetState = currentState,
         transitionSpec = {
             fadeIn(animationSpec = tween(300)) togetherWith fadeOut(animationSpec = tween(300))
         },
         label = "control_panel_content",
-        modifier = modifier
+        modifier = modifier.fillMaxSize()
     ) { state ->
         when (state) {
             ControlPanelState.ONBOARDING -> {
-                // First-run onboarding experience
                 OnboardingScreen(
                     permissionManager = permissionManager,
                     onOnboardingComplete = {
@@ -179,7 +177,6 @@ fun OverlayControlPanel(modifier: Modifier = Modifier) {
                 )
             }
             ControlPanelState.PERMISSION_SETUP -> {
-                // Permission wizard (if user skipped onboarding permissions)
                 PermissionWizard(
                     permissionManager = permissionManager,
                     onAllPermissionsGranted = {
@@ -193,7 +190,6 @@ fun OverlayControlPanel(modifier: Modifier = Modifier) {
                 )
             }
             ControlPanelState.MAIN_PANEL -> {
-                // Main control panel - all setup complete
                 MainControlPanel(
                     permissionManager = permissionManager,
                     modifier = Modifier.fillMaxSize()
@@ -396,8 +392,6 @@ private fun MainControlPanel(
         Spacer(modifier = Modifier.height(16.dp))
     }
 }
-// Removed OverlayOptionCard
-
 
 @Composable
 fun PermissionWarningCard(
@@ -437,8 +431,6 @@ fun PermissionWarningCard(
     }
 }
 
-// --- The Content Rendered inside the Overlay ---
-
 @Composable
 fun OverlayShapeContent(
     modifier: Modifier,
@@ -454,14 +446,13 @@ fun OverlayShapeContent(
     )
 
     Box(
-        modifier = modifier // <--- SDK Modifier applied here
+        modifier = modifier
             .scale(scale)
             .size(100.dp)
             .shadow(8.dp, CircleShape)
             .clip(CircleShape)
             .background(color)
             .clickable {
-                // Close on tap logic
                 OverlaySdk.hide(id)
             },
         contentAlignment = Alignment.Center

@@ -1,5 +1,6 @@
 package com.yazan.jetoverlay.data
 
+import androidx.room.ColumnInfo
 import androidx.room.Entity
 import androidx.room.PrimaryKey
 import androidx.room.TypeConverter
@@ -17,7 +18,9 @@ data class Message(
     val veiledContent: String? = null,
     val generatedResponses: List<String> = emptyList(),
     val selectedResponse: String? = null,
+    @ColumnInfo(defaultValue = "RECEIVED")
     val status: String = "RECEIVED",
+    @ColumnInfo(defaultValue = "UNKNOWN")
     val bucket: String = "UNKNOWN",
     val timestamp: Long = System.currentTimeMillis(),
     val contextTag: String? = null  // personal, work, social, email, other

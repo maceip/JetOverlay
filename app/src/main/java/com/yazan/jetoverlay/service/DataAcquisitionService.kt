@@ -60,10 +60,14 @@ class DataAcquisitionService : Service() {
             }
 
             val intent = Intent(context, DataAcquisitionService::class.java)
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-                context.startForegroundService(intent)
-            } else {
-                context.startService(intent)
+            try {
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                    context.startForegroundService(intent)
+                } else {
+                    context.startService(intent)
+                }
+            } catch (e: Exception) {
+                Logger.e(COMPONENT, "Failed to start service", e)
             }
         }
 

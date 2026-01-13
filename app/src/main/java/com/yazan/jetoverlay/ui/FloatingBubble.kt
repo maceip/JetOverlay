@@ -2,11 +2,7 @@ package com.yazan.jetoverlay.ui
 
 import android.util.Log
 import androidx.compose.animation.*
-import androidx.compose.animation.core.Animatable
-import androidx.compose.animation.core.Spring
-import androidx.compose.animation.core.animateFloatAsState
-import androidx.compose.animation.core.spring
-import androidx.compose.animation.core.tween
+import androidx.compose.animation.core.*
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -98,13 +94,37 @@ fun CollapsedBubbleView(
     pendingCount: Int = 0,
     bucket: MessageBucket = MessageBucket.UNKNOWN
 ) {
-    // Get the bucket color for border accent
-    val bucketColor = Color(bucket.color)
+    // Animation support
+    val infiniteTransition = rememberInfiniteTransition(label = "pulse")
+    val pulseScale by infiniteTransition.animateFloat(
+        initialValue = 1f,
+        targetValue = 1.2f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(1500),
+            repeatMode = RepeatMode.Reverse
+        ),
+        label = "pulseScale"
+    )
 
     Box(
-        modifier = Modifier.size(68.dp), // Slightly larger to accommodate border
+        modifier = Modifier.size(80.dp), // Larger container for ripple
         contentAlignment = Alignment.Center
     ) {
+        // Glowing Ring (only when pending count > 0)
+        if (pendingCount > 0) {
+            Box(
+                modifier = Modifier
+                    .size(60.dp)
+                    .graphicsLayer {
+                        scaleX = pulseScale
+                        scaleY = pulseScale
+                        alpha = 0.5f
+                    }
+                    .clip(CircleShape)
+                    .background(Color(0xFF6200EE)) // Purple glow
+            )
+        }
+
         // Main bubble with bucket-colored border
         Box(
             modifier = Modifier

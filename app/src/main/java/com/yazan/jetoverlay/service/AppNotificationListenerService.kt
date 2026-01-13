@@ -42,6 +42,29 @@ class AppNotificationListenerService : NotificationListenerService() {
         // Start the Intelligence Layer
         processor = MessageProcessor(repository)
         processor.start()
+
+        // Register receiver for cancellation requests
+        val receiver = object : android.content.BroadcastReceiver() {
+            override fun onReceive(context: android.content.Context?, intent: android.content.Intent?) {
+                if (intent?.action == "com.yazan.jetoverlay.ACTION_CANCEL_NOTIFICATION") {
+                    val key = intent.getStringExtra("key")
+                    if (key != null) {
+                        try {
+                            cancelNotification(key)
+                            Logger.d(COMPONENT, "Cancelled notification via broadcast: $key")
+                        } catch (e: Exception) {
+                            Logger.e(COMPONENT, "Failed to cancel notification from broadcast", e)
+                        }
+                    }
+                }
+            }
+        }
+        val filter = android.content.IntentFilter("com.yazan.jetoverlay.ACTION_CANCEL_NOTIFICATION")
+        if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.TIRAMISU) {
+            registerReceiver(receiver, filter, android.content.Context.RECEIVER_NOT_EXPORTED)
+        } else {
+            registerReceiver(receiver, filter)
+        }
     }
 
     override fun onNotificationPosted(sbn: StatusBarNotification?) {

@@ -83,6 +83,16 @@ class ResponseSender(private val context: Context) {
             // Clean up the cached action after successful send
             ReplyActionCache.remove(messageId)
 
+            // Send broadcast to cancel the notification
+            val notifKey = ReplyActionCache.getNotificationKey(messageId)
+            if (notifKey != null) {
+                val intent = Intent("com.yazan.jetoverlay.ACTION_CANCEL_NOTIFICATION").apply {
+                    putExtra("key", notifKey)
+                    `package` = context.packageName // Explicit intent for security
+                }
+                context.sendBroadcast(intent)
+            }
+
             SendResult.Success
         } catch (e: PendingIntent.CanceledException) {
             Logger.e(COMPONENT, "Reply action was cancelled", e)

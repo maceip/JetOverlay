@@ -10,7 +10,8 @@ data class OverlayConfig(
     val initialX: Int = 0,
     val initialY: Int = 0,
     val width: Dp = Dp.Unspecified,
-    val height: Dp = Dp.Unspecified
+    val height: Dp = Dp.Unspecified,
+    val isFocusable: Boolean = false
 )
 
 fun interface OverlayContentFactory {

@@ -11,7 +11,7 @@ import kotlinx.coroutines.flow.update
 object OverlaySdk {
 
     // Registry for multi-module support
-    private val registry = mutableMapOf<String, @Composable (Any?) -> Unit>()
+    private val registry = java.util.Collections.synchronizedMap(mutableMapOf<String, @Composable (Any?) -> Unit>())
 
     internal var notificationConfig: OverlayNotificationConfig = OverlayNotificationConfig()
 

@@ -4,6 +4,8 @@ import android.Manifest
 import android.os.Build
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import com.yazan.jetoverlay.util.PermissionManager
+import com.yazan.jetoverlay.util.PermissionManager.RequiredPermission
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.animateFloatAsState
@@ -66,8 +68,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.LifecycleResumeEffect
-import com.yazan.jetoverlay.util.PermissionManager
-import com.yazan.jetoverlay.util.PermissionManager.RequiredPermission
+import com.yazan.jetoverlay.util.Logger
 
 /**
  * Step-by-step permission wizard for onboarding users.
@@ -151,6 +152,14 @@ fun PermissionWizard(
         }
     }
 
+    // Final Completion Screen
+    if (wizardCompleted) {
+        FinalCompletionScreen(
+            onStart = onAllPermissionsGranted
+        )
+        return
+    }
+
     Column(
         modifier = modifier
             .fillMaxSize()
@@ -192,23 +201,11 @@ fun PermissionWizard(
             Spacer(modifier = Modifier.height(24.dp))
         }
 
-        // Permission steps indicator
+        // Permission steps indicator - UPDATED: Shows continuous progress
         PermissionStepsIndicator(
-            permissions = if (isInOptionalSection) {
-                RequiredPermission.allOptional()
-            } else {
-                RequiredPermission.allRequired()
-            },
-            statuses = if (isInOptionalSection) {
-                permissionStatuses.drop(requiredCount)
-            } else {
-                permissionStatuses.take(requiredCount)
-            },
-            currentIndex = if (isInOptionalSection) {
-                currentStepIndex - requiredCount
-            } else {
-                currentStepIndex
-            }
+            permissions = allPermissions,
+            statuses = permissionStatuses,
+            currentIndex = currentStepIndex
         )
 
         Spacer(modifier = Modifier.height(24.dp))
@@ -227,85 +224,157 @@ fun PermissionWizard(
                 },
                 label = "permission_card"
             ) { stepIndex ->
-                val permission = allPermissions[stepIndex]
+                if (stepIndex < allPermissions.size) {
+                    val permission = allPermissions[stepIndex]
 
-                PermissionRequestCard(
-                    permission = permission,
-                    isGranted = permissionStatuses[stepIndex],
-                    deniedCount = permissionManager.getDeniedCount(permission),
-                    isOptional = stepIndex >= requiredCount,
-                    onRequestPermission = {
-                        if (permissionManager.requiresSettingsNavigation(permission)) {
-                            when (permission) {
-                                RequiredPermission.OVERLAY -> {
-                                    settingsLauncher.launch(permissionManager.getOverlayPermissionIntent())
-                                }
-                                RequiredPermission.NOTIFICATION_LISTENER -> {
-                                    settingsLauncher.launch(permissionManager.getNotificationListenerSettingsIntent())
-                                }
-                                RequiredPermission.CALL_SCREENING -> {
-                                    val intent = permissionManager.getCallScreeningRoleIntent()
-                                    if (intent != null) {
-                                        settingsLauncher.launch(intent)
+                    PermissionRequestCard(
+                        permission = permission,
+                        isGranted = permissionStatuses[stepIndex],
+                        deniedCount = permissionManager.getDeniedCount(permission),
+                        isOptional = stepIndex >= requiredCount,
+                        onRequestPermission = {
+                            Logger.d("PermissionWizard", "Requesting permission: ${permission.title}")
+                            if (permissionManager.requiresSettingsNavigation(permission)) {
+                                when (permission) {
+                                    RequiredPermission.OVERLAY -> {
+                                        settingsLauncher.launch(permissionManager.getOverlayPermissionIntent())
+                                    }
+                                    RequiredPermission.NOTIFICATION_LISTENER -> {
+                                        settingsLauncher.launch(permissionManager.getNotificationListenerSettingsIntent())
+                                    }
+                                    RequiredPermission.CALL_SCREENING -> {
+                                        Logger.d("PermissionWizard", "Getting Call Screening intent")
+                                        val intent = permissionManager.getCallScreeningRoleIntent()
+                                        if (intent != null) {
+                                            Logger.d("PermissionWizard", "Launching Call Screening intent: $intent")
+                                            try {
+                                                settingsLauncher.launch(intent)
+                                            } catch (e: Exception) {
+                                                Logger.e("PermissionWizard", "Failed to launch role intent", e)
+                                                settingsLauncher.launch(permissionManager.getAppSettingsIntent())
+                                            }
+                                        } else {
+                                            Logger.d("PermissionWizard", "Call Screening intent is null, using fallback")
+                                            settingsLauncher.launch(permissionManager.getAppSettingsIntent())
+                                        }
+                                    }
+                                    else -> {
+                                        settingsLauncher.launch(permissionManager.getAppSettingsIntent())
                                     }
                                 }
-                                else -> {
-                                    settingsLauncher.launch(permissionManager.getAppSettingsIntent())
+                            } else {
+                                val runtimePermissions = permissionManager.getRuntimePermissions(permission)
+                                if (runtimePermissions.isNotEmpty()) {
+                                    runtimePermissionLauncher.launch(runtimePermissions)
                                 }
                             }
-                        } else {
-                            val runtimePermissions = permissionManager.getRuntimePermissions(permission)
-                            if (runtimePermissions.isNotEmpty()) {
-                                runtimePermissionLauncher.launch(runtimePermissions)
+                        },
+                        onOpenSettings = {
+                            settingsLauncher.launch(permissionManager.getAppSettingsIntent())
+                        },
+                        onSkip = if (stepIndex >= requiredCount) {
+                            {
+                                // Skip logic: Advance to next step regardless of grant status
+                                if (currentStepIndex < allPermissions.size - 1) {
+                                    currentStepIndex++
+                                } else {
+                                    // Finished last optional step
+                                    onSkipOptional()
+                                }
                             }
-                        }
-                    },
-                    onOpenSettings = {
-                        settingsLauncher.launch(permissionManager.getAppSettingsIntent())
-                    },
-                    onSkip = if (stepIndex >= requiredCount) {
-                        {
-                            // Skip this optional permission
-                            val nextMissing = permissionStatuses.drop(stepIndex + 1)
-                                .indexOfFirst { !it }
-                            if (nextMissing != -1) {
-                                currentStepIndex = stepIndex + 1 + nextMissing
-                            } else {
-                                onSkipOptional()
-                            }
-                        }
-                    } else null
-                )
+                        } else null
+                    )
+                }
             }
         }
 
         Spacer(modifier = Modifier.height(24.dp))
 
-        // Bottom actions
+        // Manual Navigation Buttons (to prevent getting stuck)
         if (isInOptionalSection) {
-            OutlinedButton(
-                onClick = onSkipOptional,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .testTag("skip_optional_button")
-            ) {
-                Text("Skip Optional Permissions")
-            }
-        } else if (allRequiredGranted) {
-            Button(
-                onClick = onAllPermissionsGranted,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .testTag("start_button"),
-                colors = ButtonDefaults.buttonColors(
-                    containerColor = MaterialTheme.colorScheme.primary
-                )
-            ) {
-                Text("Start JetOverlay")
+            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                if (currentStepIndex < allPermissions.size - 1) {
+                    TextButton(onClick = { currentStepIndex++ }) {
+                        Text("Next")
+                    }
+                } else {
+                     Button(onClick = onSkipOptional) {
+                        Text("Finish")
+                    }
+                }
             }
         }
     }
 }
+
+@Composable
+fun FinalCompletionScreen(onStart: () -> Unit) {
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .padding(24.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.Center
+    ) {
+        // Purple Overlay Graphic
+        Box(
+            modifier = Modifier
+                .size(120.dp)
+                .clip(CircleShape)
+                .background(
+                    androidx.compose.ui.graphics.Brush.linearGradient(
+                        listOf(Color(0xFF6200EE), Color(0xFF3700B3))
+                    )
+                ),
+            contentAlignment = Alignment.Center
+        ) {
+            Icon(
+                imageVector = Icons.Default.Check,
+                contentDescription = null,
+                tint = Color.White,
+                modifier = Modifier.size(48.dp)
+            )
+        }
+
+        Spacer(modifier = Modifier.height(32.dp))
+
+        Text(
+            text = "You're All Set!",
+            style = MaterialTheme.typography.headlineMedium,
+            fontWeight = FontWeight.Bold,
+            color = MaterialTheme.colorScheme.primary
+        )
+
+        Spacer(modifier = Modifier.height(16.dp))
+
+        Text(
+            text = "The app will now go into auto mode.",
+            style = MaterialTheme.typography.bodyLarge,
+            textAlign = TextAlign.Center
+        )
+        
+        Text(
+            text = "The overlay will appear automatically when you receive messages.",
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            textAlign = TextAlign.Center,
+            modifier = Modifier.padding(top = 8.dp)
+        )
+
+        Spacer(modifier = Modifier.height(48.dp))
+
+        Button(
+            onClick = onStart,
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(50.dp),
+            colors = ButtonDefaults.buttonColors(
+                containerColor = MaterialTheme.colorScheme.primary
+            )
+        ) {
+            Text("Start", style = MaterialTheme.typography.titleMedium)
+        }
+    }
 
 @Composable
 private fun ProgressSection(

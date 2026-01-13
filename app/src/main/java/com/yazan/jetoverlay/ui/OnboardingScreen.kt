@@ -171,16 +171,16 @@ fun OnboardingScreen(
             }
         }
 
-        // Step indicators at the bottom
+        // Step indicators at the top
         if (currentStep < steps.size - 1) {
             Box(
                 modifier = Modifier.fillMaxSize(),
-                contentAlignment = Alignment.BottomCenter
+                contentAlignment = Alignment.TopCenter
             ) {
                 StepIndicators(
                     currentStep = currentStep,
                     totalSteps = steps.size - 1, // Don't count permissions step
-                    modifier = Modifier.padding(bottom = 32.dp)
+                    modifier = Modifier.padding(top = 48.dp)
                 )
             }
         }

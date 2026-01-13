@@ -53,11 +53,62 @@ class OverlayService : Service() {
         val currentIds = activeViews.keys.toSet()
         val requestedIds = requestedOverlays.keys
 
+        // 1. Remove
         (currentIds - requestedIds).forEach { removeOverlay(it) }
 
+        // 2. Add
         (requestedIds - currentIds).forEach { id ->
             requestedOverlays[id]?.let { overlayData ->
                 addOverlay(id, overlayData)
+            }
+        }
+
+        // 3. Update existing
+        (requestedIds intersect currentIds).forEach { id ->
+            val existingView = activeViews[id]
+            val newData = requestedOverlays[id]
+            if (existingView != null && newData != null) {
+                updateOverlay(id, existingView, newData)
+            }
+        }
+    }
+
+    private fun updateOverlay(
+        id: String,
+        viewWrapper: OverlayViewWrapper,
+        data: OverlaySdk.ActiveOverlay
+    ) {
+        // Check if layout params need update (e.g. focusable flag)
+        val params = viewWrapper.layoutParams as? WindowManager.LayoutParams ?: return
+        
+        val currentFlags = params.flags
+        val shouldBeFocusable = data.config.isFocusable
+        
+        // Calculate expected flags based on focusability
+        // FLAG_NOT_FOCUSABLE = 8
+        val isCurrentlyNotFocusable = (currentFlags and WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE) != 0
+        
+        var needsUpdate = false
+        
+        if (shouldBeFocusable && isCurrentlyNotFocusable) {
+            // Remove NOT_FOCUSABLE
+            params.flags = params.flags and WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE.inv()
+            needsUpdate = true
+        } else if (!shouldBeFocusable && !isCurrentlyNotFocusable) {
+            // Add NOT_FOCUSABLE
+            params.flags = params.flags or WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE
+            needsUpdate = true
+        }
+
+        // Ensure position is synced if changed (though drag handles this mostly)
+        // Only update if external config changed significantly, to avoid fighting the drag loop
+        // For now, we only care about focus flags for the IME fix.
+
+        if (needsUpdate && viewWrapper.isAttachedToWindow) {
+            try {
+                windowManager.updateViewLayout(viewWrapper, params)
+            } catch (e: Exception) {
+                // Ignore detached
             }
         }
     }
@@ -88,7 +139,11 @@ class OverlayService : Service() {
                     params.x += dragAmount.x.toInt()
                     params.y += dragAmount.y.toInt()
                     if (viewWrapper.isAttachedToWindow) {
-                        windowManager.updateViewLayout(viewWrapper, params)
+                        try {
+                            windowManager.updateViewLayout(viewWrapper, params)
+                        } catch (e: Exception) {
+                            // View might have been detached during drag
+                        }
                     }
                 }
             }
