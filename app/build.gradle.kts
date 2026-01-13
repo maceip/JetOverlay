@@ -68,6 +68,7 @@ dependencies {
     implementation(libs.androidx.material3)
     implementation(libs.androidx.material.icons.core)
     implementation(libs.androidx.material.icons.extended)
+    implementation("org.jetbrains.kotlin:kotlin-reflect")
 
     // LiteRT-LM
     implementation(libs.litertlm.android)
