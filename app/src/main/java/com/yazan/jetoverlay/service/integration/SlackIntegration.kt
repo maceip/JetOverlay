@@ -21,7 +21,7 @@ object SlackIntegration {
 
     // TODO: move secret to secure storage/remote config before release
     private const val CLIENT_ID = "8516887257863.10240039617412"
-    private const val CLIENT_SECRET = "YOUR_SLACK_CLIENT_SECRET" // TODO: Replace
+    private const val CLIENT_SECRET = "97709708281e3aa889287a06c3da203f"
     // Slack app should redirect to this page, which must forward to jetoverlay://slack-callback
     private const val REDIRECT_URI = "https://maceip.github.io/id/slack-oauth.html"
     private const val TAG = "SlackIntegration"
