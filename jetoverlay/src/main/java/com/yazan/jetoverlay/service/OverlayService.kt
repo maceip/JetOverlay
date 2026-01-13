@@ -12,9 +12,7 @@ import android.os.IBinder
 import android.util.Log
 import android.view.Gravity
 import android.view.WindowManager
-import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.input.pointer.pointerInput
 import com.yazan.jetoverlay.api.OverlaySdk
 import com.yazan.jetoverlay.internal.OverlayViewWrapper
 import kotlinx.coroutines.CoroutineScope
@@ -143,24 +141,8 @@ class OverlayService : Service() {
         }
 
         viewWrapper.setContent {
-            // Drag Modifier
-            val dragModifier = Modifier.pointerInput(Unit) {
-                detectDragGestures { change, dragAmount ->
-                    change.consume()
-                    params.x += dragAmount.x.toInt()
-                    params.y += dragAmount.y.toInt()
-                    if (viewWrapper.isAttachedToWindow) {
-                        try {
-                            windowManager.updateViewLayout(viewWrapper, params)
-                        } catch (e: Exception) {
-                            // View might have been detached during drag
-                        }
-                    }
-                }
-            }
-
             OverlaySdk.getContentFactory().Content(
-                modifier = dragModifier,
+                modifier = Modifier,
                 id = id,
                 payload = data.payload
             )

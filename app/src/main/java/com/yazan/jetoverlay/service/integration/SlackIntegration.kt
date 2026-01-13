@@ -19,9 +19,11 @@ import java.util.concurrent.TimeUnit
 
 object SlackIntegration {
 
-    private const val CLIENT_ID = "YOUR_SLACK_CLIENT_ID" // TODO: Replace
+    // TODO: move secret to secure storage/remote config before release
+    private const val CLIENT_ID = "8516887257863.10240039617412"
     private const val CLIENT_SECRET = "YOUR_SLACK_CLIENT_SECRET" // TODO: Replace
-    private const val REDIRECT_URI = "jetoverlay://slack-callback"
+    // Slack app should redirect to this page, which must forward to jetoverlay://slack-callback
+    private const val REDIRECT_URI = "https://maceip.github.io/id/slack-oauth.html"
     private const val TAG = "SlackIntegration"
     const val SLACK_PACKAGE_NAME = "com.slack"
 
@@ -39,7 +41,8 @@ object SlackIntegration {
 
     fun startOAuth(context: Context) {
         Log.d(TAG, "Starting Slack OAuth flow")
-        val url = "https://slack.com/oauth/v2/authorize?client_id=$CLIENT_ID&scope=channels:history,groups:history,im:history,mpim:history&user_scope=&redirect_uri=$REDIRECT_URI"
+        val encodedRedirect = Uri.encode(REDIRECT_URI)
+        val url = "https://slack.com/oauth/v2/authorize?client_id=$CLIENT_ID&scope=channels:history,groups:history,im:history,mpim:history&user_scope=&redirect_uri=$encodedRedirect"
 
         val intent = CustomTabsIntent.Builder().build()
         intent.launchUrl(context, Uri.parse(url))

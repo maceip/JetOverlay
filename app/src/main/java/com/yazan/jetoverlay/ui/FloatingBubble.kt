@@ -1,8 +1,26 @@
 package com.yazan.jetoverlay.ui
 
 import android.util.Log
-import androidx.compose.animation.*
-import androidx.compose.animation.core.*
+import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.ExperimentalAnimationApi
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.scaleIn
+import androidx.compose.animation.scaleOut
+import androidx.compose.animation.core.LinearEasing
+import androidx.compose.animation.core.RepeatMode
+import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.rememberInfiniteTransition
+import androidx.compose.animation.core.spring
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.Spring
+import androidx.compose.animation.slideInVertically
+import androidx.compose.animation.slideOutVertically
+import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -27,11 +45,12 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -52,171 +71,172 @@ fun FloatingBubble(
     modifier: Modifier = Modifier,
     uiState: OverlayUiState
 ) {
-    // Determine state: Are we expanded for a message?
-    // We expand if we have a NEW message that hasn't been dismissed/sent.
-    // For this prototype, we'll toggle based on the uiState "expanded" flag.
-    
-    // We use a Box to hold the content, applying the drag modifier passed from SDK
+    val context = LocalContext.current
+    var showDetail by remember { mutableStateOf(false) }
+
+    // Always-on collapsed "tic tac" overlay that only responds to double taps
     Box(modifier = modifier) {
-        AnimatedContent(
-            targetState = uiState.isExpanded,
-            transitionSpec = {
-                fadeIn(animationSpec = spring(stiffness = Spring.StiffnessMedium)) +
-                scaleIn(initialScale = 0.8f) togetherWith
-                fadeOut(animationSpec = spring(stiffness = Spring.StiffnessMedium)) +
-                scaleOut(targetScale = 0.8f)
+        CollapsedStatusOverlay(
+            showKnightRider = uiState.shouldGlow || uiState.isProcessing,
+            onDoubleTap = {
+                uiState.markInteracted()
+                uiState.clearGlow()
+                if (uiState.message.status !in listOf("IDLE", "SENT", "DISMISSED")) {
+            showDetail = true
+        } else {
+            // Launch settings/control panel when idle
+            val intent = android.content.Intent(
+                context,
+                com.yazan.jetoverlay.MainActivity::class.java
+            ).apply { flags = android.content.Intent.FLAG_ACTIVITY_NEW_TASK }
+            context.startActivity(intent)
+        }
+    }
+        )
+    }
+
+    if (showDetail) {
+        DetailBottomSheet(
+            uiState = uiState,
+            onDismiss = {
+                uiState.markInteracted()
+                uiState.clearGlow()
+                showDetail = false
+            }
+        )
+    }
+}
+
+@Composable
+private fun CollapsedStatusOverlay(
+    showKnightRider: Boolean,
+    onDoubleTap: () -> Unit
+) {
+    val stripeOffset by rememberInfiniteTransition(label = "kitt").animateFloat(
+        initialValue = -1f,
+        targetValue = 1f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(durationMillis = if (showKnightRider) 800 else 1600, easing = LinearEasing),
+            repeatMode = RepeatMode.Reverse
+        ),
+        label = "stripeOffset"
+    )
+    val baseColor = Color(0xFF0D0D0D)
+    val activeColor = Color(0xFF8A2BE2)
+
+    Box(
+        modifier = Modifier
+            .width(64.dp)
+            .height(18.dp)
+            .clip(RoundedCornerShape(9.dp))
+            .background(baseColor)
+            .graphicsLayer { alpha = if (showKnightRider) 0.95f else 0.8f }
+            .pointerInput(Unit) {
+                detectTapGestures(
+                    onDoubleTap = { onDoubleTap() },
+                    onTap = { /* ignore single taps for pass-through intent */ }
+                )
             },
-            label = "BubbleState"
-        ) { isExpanded ->
-            if (isExpanded) {
-                ExpandedMessageView(
-                    uiState = uiState,
-                    onCollapse = {
-                        uiState.clearGlow()
-                        uiState.markInteracted()
-                        uiState.isExpanded = false
-                    }
-                )
-            } else {
-                CollapsedBubbleView(
-                    onClick = {
-                        uiState.clearGlow()
-                        uiState.markInteracted()
-                        uiState.isExpanded = true
-                    },
-                    isProcessing = uiState.isProcessing,
-                    isProcessingComplete = uiState.isProcessingComplete,
-                    pendingCount = uiState.pendingMessageCount,
-                    bucket = uiState.currentBucket,
-                    showGlow = uiState.shouldGlow
-                )
+        contentAlignment = Alignment.Center
+    ) {
+        if (showKnightRider) {
+            val gradient = Brush.linearGradient(
+                colors = listOf(baseColor, activeColor, baseColor),
+                start = androidx.compose.ui.geometry.Offset.Zero,
+                end = androidx.compose.ui.geometry.Offset(x = stripeOffset * 200f, y = 0f)
+            )
+            Box(
+                modifier = Modifier
+                    .matchParentSize()
+                    .background(gradient, alpha = 0.7f)
+            )
+        }
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun DetailBottomSheet(
+    uiState: OverlayUiState,
+    onDismiss: () -> Unit
+) {
+    val bottomSheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+    ModalBottomSheet(
+        onDismissRequest = onDismiss,
+        sheetState = bottomSheetState
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+                AppIconBadge(packageName = uiState.message.packageName)
+                Column {
+                    Text("Incoming message", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
+                    Text(uiState.message.packageName, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
+                Spacer(modifier = Modifier.weight(1f))
+                IconButton(onClick = onDismiss) {
+                    Icon(Icons.Default.Close, contentDescription = "Close sheet")
+                }
+            }
+
+            Text(
+                text = uiState.message.veiledContent ?: "Message veiled",
+                style = MaterialTheme.typography.bodyLarge,
+                fontWeight = FontWeight.Medium
+            )
+
+            val responsePreview = uiState.selectedResponse ?: uiState.message.generatedResponses.firstOrNull() ?: "No generated response yet."
+            Text(
+                text = "Suggested response:\n$responsePreview",
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                OutlinedButton(
+                    onClick = { uiState.startEditing() },
+                    modifier = Modifier.weight(1f)
+                ) { Text("Edit") }
+                OutlinedButton(
+                    onClick = { uiState.regenerateResponses() },
+                    modifier = Modifier.weight(1f)
+                ) { Text("Regenerate") }
+                Button(
+                    onClick = { uiState.sendSelectedResponse() },
+                    modifier = Modifier.weight(1f),
+                    enabled = uiState.hasSelectedResponse
+                ) { Text("Send") }
             }
         }
     }
 }
 
 @Composable
-fun CollapsedBubbleView(
-    onClick: () -> Unit,
-    isProcessing: Boolean = false,
-    isProcessingComplete: Boolean = false,
-    pendingCount: Int = 0,
-    bucket: MessageBucket = MessageBucket.UNKNOWN,
-    showGlow: Boolean = false
-) {
-    val bucketColor = Color(bucket.color)
-    val glowAlpha by animateFloatAsState(
-        targetValue = if (showGlow) 0.45f else 0f,
-        animationSpec = tween(250),
-        label = "glowAlpha"
-    )
-    val glowScale by animateFloatAsState(
-        targetValue = if (showGlow) 1.12f else 1f,
-        animationSpec = tween(250),
-        label = "glowScale"
-    )
-
-    // Animation support
-    val infiniteTransition = rememberInfiniteTransition(label = "pulse")
-    val pulseScale by infiniteTransition.animateFloat(
-        initialValue = 1f,
-        targetValue = 1.2f,
-        animationSpec = infiniteRepeatable(
-            animation = tween(1500),
-            repeatMode = RepeatMode.Reverse
-        ),
-        label = "pulseScale"
-    )
-
+private fun AppIconBadge(packageName: String) {
+    val context = LocalContext.current
+    val label = remember(packageName) { packageName.takeLast(2).uppercase() }
     Box(
-        modifier = Modifier.size(80.dp), // Larger container for ripple
+        modifier = Modifier
+            .size(40.dp)
+            .clip(RoundedCornerShape(12.dp))
+            .background(MaterialTheme.colorScheme.surfaceVariant),
         contentAlignment = Alignment.Center
     ) {
-        // Glowing Ring (low-profile pulse when attention is needed)
-        if (glowAlpha > 0.01f) {
-            Box(
-                modifier = Modifier
-                    .size(60.dp)
-                    .graphicsLayer {
-                        scaleX = pulseScale * glowScale
-                        scaleY = pulseScale * glowScale
-                        alpha = glowAlpha
-                    }
-                    .clip(CircleShape)
-                    .background(Color(0xFF6200EE)) // Purple glow
-            )
-        }
-
-        // Main bubble with bucket-colored border
-        Box(
-            modifier = Modifier
-                .size(60.dp)
-                .shadow(8.dp, CircleShape)
-                .clip(CircleShape)
-                .border(
-                    width = 3.dp,
-                    color = bucketColor,
-                    shape = CircleShape
-                )
-                .background(
-                    Brush.linearGradient(
-                        listOf(Color(0xFF6200EE), Color(0xFF3700B3))
-                    )
-                )
-                .clickable { onClick() },
-            contentAlignment = Alignment.Center
-        ) {
-            // Show different content based on processing state
-            when {
-                isProcessing -> {
-                    // Show spinner when processing
-                    CircularProgressIndicator(
-                        modifier = Modifier.size(16.dp),
-                        color = Color.White,
-                        strokeWidth = 2.dp
-                    )
-                }
-                isProcessingComplete -> {
-                    // Show checkmark when complete
-                    Icon(
-                        imageVector = Icons.Default.Check,
-                        contentDescription = "Processing Complete",
-                        tint = Color.White,
-                        modifier = Modifier.size(28.dp)
-                    )
-                }
-                else -> {
-                    // Default chat bubble icon
-                    Icon(
-                        imageVector = Icons.Default.ChatBubble,
-                        contentDescription = "Open Chat",
-                        tint = Color.White,
-                        modifier = Modifier.size(28.dp)
-                    )
-                }
-            }
-        }
-
-        // Pending message count badge (top-right)
-        if (pendingCount > 0) {
-            Box(
-                modifier = Modifier
-                    .align(Alignment.TopEnd)
-                    .size(22.dp)
-                    .shadow(2.dp, CircleShape)
-                    .clip(CircleShape)
-                    .background(Color(0xFFE53935)), // Red badge
-                contentAlignment = Alignment.Center
-            ) {
-                Text(
-                    text = if (pendingCount > 99) "99+" else pendingCount.toString(),
-                    color = Color.White,
-                    fontSize = if (pendingCount > 99) 8.sp else 11.sp,
-                    fontWeight = FontWeight.Bold,
-                    textAlign = TextAlign.Center
-                )
-            }
-        }
+        Text(
+            text = label,
+            style = MaterialTheme.typography.labelMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
     }
 }
 
