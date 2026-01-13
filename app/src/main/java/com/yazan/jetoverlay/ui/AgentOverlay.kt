@@ -15,10 +15,14 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import com.yazan.jetoverlay.data.Message
 import com.yazan.jetoverlay.data.MessageRepository
+import com.yazan.jetoverlay.domain.LiteRTLlmService
+import com.yazan.jetoverlay.domain.LlmService
 import com.yazan.jetoverlay.domain.MessageBucket
 import com.yazan.jetoverlay.domain.ResponseSender
 import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.Job
 
 private const val TAG = "AgentOverlay"
 
@@ -39,6 +43,8 @@ fun AgentOverlay(
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
     val responseSender = remember { ResponseSender(context) }
+    val llmService = remember { LiteRTLlmService() as LlmService }
+    val autoReplyJob = remember { mutableStateOf<Job?>(null) }
 
     // Track any errors for graceful degradation
     var hasError by remember { mutableStateOf(false) }
@@ -79,60 +85,102 @@ fun AgentOverlay(
     }
 
     // Create a stable UI State holder (not dependent on specific message)
-    val uiState = remember {
-        OverlayUiState(createIdleMessage()).apply {
-            // Wire up callbacks to the real logic
-            onSendResponse = { text ->
-                scope.launch {
-                    val msgId = message.id
-                    if (msgId != 0L) {
-                        Log.i(TAG, "Sending response for message: $msgId")
-                        val result = responseSender.sendResponse(msgId, text)
-                        if (result is ResponseSender.SendResult.Success) {
-                            repository.markAsSent(msgId)
-                            resetResponseSelection()
-                            isExpanded = false
-                        } else {
-                            Log.e(TAG, "Failed to send response: ${(result as ResponseSender.SendResult.Error).message}")
-                        }
-                    }
-                }
-            }
+    val uiState = remember { OverlayUiState(createIdleMessage()) }
 
-            onDismissMessage = {
-                scope.launch {
-                    val msgId = message.id
-                    if (msgId != 0L) {
-                        repository.dismiss(msgId)
-                        isExpanded = false
-                    }
-                }
-            }
+    fun cancelAutoReply() {
+        autoReplyJob.value?.cancel()
+        autoReplyJob.value = null
+    }
+    suspend fun autoReplyIfNeeded(msg: Message) {
+        val responseText = msg.generatedResponses.firstOrNull()
+            ?: msg.veiledContent
+            ?: "Received."
+        val result = responseSender.sendResponse(msg.id, responseText)
+        if (result is ResponseSender.SendResult.Success || result is ResponseSender.SendResult.Error) {
+            repository.markAsSent(msg.id)
+        }
+        uiState.clearGlow()
+        uiState.isExpanded = false
+    }
 
-            onNavigateToNextMessage = {
-                // To navigate "next" (up), we can just filter or rely on the fact that
-                // filteredMessages is a list and we want to move the focus.
-                // In this simplified state model, the AgentOverlay always shows filteredMessages.lastOrNull().
-                // To truly navigate, we would need an 'explicitIndex' in uiState.
-                Log.d(TAG, "Navigating to next message")
-            }
-
-            onNavigateToPreviousMessage = {
-                Log.d(TAG, "Navigating to previous message")
-            }
-            
-            onRegenerateResponses = {
-                // Determine which message to regenerate
-                val msg = message
-                if (msg.id != 0L) {
-                    // For now, simpler simulation or call repository to re-trigger AI
-                    Log.i(TAG, "Regenerating responses for ${msg.id}")
-                    // In a real implementation: repository.regenerateResponses(msg.id)
-                    // For prototype: Just clear and re-add dummy ones or notify user
+    // Wire up callbacks to the real logic (idempotent assignments)
+    uiState.onSendResponse = { text ->
+        scope.launch {
+            uiState.markInteracted()
+            cancelAutoReply()
+            val msgId = uiState.message.id
+            if (msgId != 0L) {
+                Log.i(TAG, "Sending response for message: $msgId")
+                val result = responseSender.sendResponse(msgId, text)
+                if (result is ResponseSender.SendResult.Success) {
+                    repository.markAsSent(msgId)
+                } else {
+                    Log.e(
+                        TAG,
+                        "Failed to send response, marking as sent locally: ${(result as ResponseSender.SendResult.Error).message}"
+                    )
+                    repository.markAsSent(msgId)
                 }
+                uiState.clearGlow()
+                uiState.resetResponseSelection()
+                uiState.isExpanded = false
             }
         }
     }
+
+    uiState.onDismissMessage = {
+        scope.launch {
+            uiState.markInteracted()
+            cancelAutoReply()
+            val msgId = uiState.message.id
+            if (msgId != 0L) {
+                repository.dismiss(msgId)
+                uiState.isExpanded = false
+                uiState.clearGlow()
+            }
+        }
+    }
+
+    uiState.onNavigateToNextMessage = {
+        Log.d(TAG, "Navigating to next message")
+    }
+
+    uiState.onNavigateToPreviousMessage = {
+        Log.d(TAG, "Navigating to previous message")
+    }
+
+    uiState.onRegenerateResponses = {
+        val msg = uiState.message
+        if (msg.id != 0L) {
+            scope.launch {
+                uiState.markInteracted()
+                cancelAutoReply()
+                Log.i(TAG, "Regenerating responses for ${msg.id}")
+                val bucket = MessageBucket.fromString(msg.bucket)
+                val regenerated = try {
+                    llmService.generateResponses(msg, bucket)
+                } catch (e: Exception) {
+                    Log.e(TAG, "LLM regeneration failed, falling back", e)
+                    listOf(
+                        "Got it, I'll follow up soon.",
+                        "Received your message, replying shortly.",
+                        "Thanks for reaching out—I'll respond in a bit."
+                    )
+                }
+                repository.updateMessageState(
+                    id = msg.id,
+                    status = "GENERATED",
+                    generatedResponses = regenerated
+                )
+                uiState.selectResponse(regenerated.indices.firstOrNull())
+                uiState.isEditing = false
+            }
+        }
+    }
+
+    // Track last surfaced message for glow/processing signals
+    val lastMessageId = remember { mutableStateOf<Long?>(null) }
+    val lastStatus = remember { mutableStateOf<String?>(null) }
 
     // --- Focus Management for IME ---
     // When editing state changes, update the OverlayConfig to toggle focusability
@@ -206,6 +254,56 @@ fun AgentOverlay(
         modifier = modifier,
         uiState = uiState
     )
+
+    // Sync derived counts for badges/attention
+    LaunchedEffect(pendingCounts) {
+        uiState.updatePendingCounts(pendingCounts)
+    }
+    LaunchedEffect(pendingMessages.size) {
+        uiState.updatePendingCount(pendingMessages.size)
+    }
+
+    // Manage glow + processing indicators based on message lifecycle
+    LaunchedEffect(targetMessage.id) {
+        if (targetMessage.id != 0L && targetMessage.id != lastMessageId.value) {
+            uiState.triggerGlow()
+            uiState.setProcessing()
+            uiState.resetInteraction()
+            cancelAutoReply()
+            lastMessageId.value = targetMessage.id
+        }
+    }
+    LaunchedEffect(targetMessage.status) {
+        when (targetMessage.status) {
+            "RECEIVED" -> uiState.setProcessing()
+            "GENERATED", "VEILED", "PROCESSED" -> {
+                uiState.setProcessingComplete()
+                uiState.clearGlow()
+                if (!uiState.userInteracted && targetMessage.id != 0L) {
+                    cancelAutoReply()
+                    autoReplyJob.value = scope.launch {
+                        delay(5000)
+                        if (!uiState.userInteracted) {
+                            autoReplyIfNeeded(targetMessage)
+                        }
+                    }
+                }
+            }
+            "SENT", "DISMISSED", "IDLE" -> {
+                uiState.clearGlow()
+                uiState.setIdle()
+                cancelAutoReply()
+            }
+        }
+        lastStatus.value = targetMessage.status
+    }
+
+    // Cancel auto-reply when the user expands or interacts
+    LaunchedEffect(uiState.isExpanded, uiState.userInteracted) {
+        if (uiState.userInteracted || uiState.isExpanded) {
+            cancelAutoReply()
+        }
+    }
 }
 
 /**

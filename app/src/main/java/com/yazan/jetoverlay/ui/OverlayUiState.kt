@@ -47,6 +47,14 @@ class OverlayUiState(
     // Pending counts per bucket for badge display
     var pendingCounts: Map<MessageBucket, Int> by mutableStateOf(emptyMap())
 
+    // Attention glow for newly arrived/processing messages
+    var shouldGlow by mutableStateOf(false)
+        private set
+
+    // User interaction flag to suppress auto-reply
+    var userInteracted by mutableStateOf(false)
+        private set
+
     // Response selection state
     var selectedResponseIndex: Int? by mutableStateOf(null)
 
@@ -101,6 +109,22 @@ class OverlayUiState(
 
     fun updatePendingCount(count: Int) {
         pendingMessageCount = count
+    }
+
+    fun triggerGlow() {
+        shouldGlow = true
+    }
+
+    fun clearGlow() {
+        shouldGlow = false
+    }
+
+    fun markInteracted() {
+        userInteracted = true
+    }
+
+    fun resetInteraction() {
+        userInteracted = false
     }
 
     fun selectBucket(bucket: MessageBucket?) {

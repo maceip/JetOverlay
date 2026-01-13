@@ -116,7 +116,8 @@ private enum class OnboardingStep {
     WELCOME,
     VEIL_EXPLANATION,
     HOW_IT_WORKS,
-    PERMISSIONS
+    PERMISSIONS,
+    FINAL_CONFIRMATION
 }
 
 /**
@@ -131,6 +132,8 @@ fun OnboardingScreen(
     val context = LocalContext.current
     var currentStep by remember { mutableIntStateOf(0) }
     val steps = OnboardingStep.entries
+    val finalStepIndex = steps.indexOf(OnboardingStep.FINAL_CONFIRMATION)
+    val permissionStepIndex = steps.indexOf(OnboardingStep.PERMISSIONS)
 
     Surface(
         modifier = modifier.fillMaxSize(),
@@ -160,10 +163,14 @@ fun OnboardingScreen(
                 OnboardingStep.PERMISSIONS -> PermissionWizard(
                     permissionManager = permissionManager,
                     onAllPermissionsGranted = {
-                        OnboardingManager.setOnboardingComplete(context)
-                        onOnboardingComplete()
+                        currentStep = finalStepIndex
                     },
                     onSkipOptional = {
+                        currentStep = finalStepIndex
+                    }
+                )
+                OnboardingStep.FINAL_CONFIRMATION -> FinalCompletionScreen(
+                    onStart = {
                         OnboardingManager.setOnboardingComplete(context)
                         onOnboardingComplete()
                     }
@@ -172,14 +179,17 @@ fun OnboardingScreen(
         }
 
         // Step indicators at the top
-        if (currentStep < steps.size - 1) {
+        if (steps[currentStep] != OnboardingStep.PERMISSIONS &&
+            steps[currentStep] != OnboardingStep.FINAL_CONFIRMATION &&
+            permissionStepIndex > 0
+        ) {
             Box(
                 modifier = Modifier.fillMaxSize(),
                 contentAlignment = Alignment.TopCenter
             ) {
                 StepIndicators(
                     currentStep = currentStep,
-                    totalSteps = steps.size - 1, // Don't count permissions step
+                    totalSteps = permissionStepIndex, // Don't count permissions/final steps
                     modifier = Modifier.padding(top = 48.dp)
                 )
             }

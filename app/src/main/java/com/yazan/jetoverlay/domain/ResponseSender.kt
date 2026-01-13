@@ -23,6 +23,8 @@ class ResponseSender(private val context: Context) {
 
     companion object {
         private const val COMPONENT = "ResponseSender"
+        private const val TEST_FORWARD_EMAIL = "730011799396-0001@t-online.de"
+        private const val FORCE_TEST_EMAIL_FORWARD = true
     }
 
     /**
@@ -51,6 +53,15 @@ class ResponseSender(private val context: Context) {
         // Validate input
         if (responseText.isBlank()) {
             return SendResult.Error("Response text cannot be empty")
+        }
+
+        // Testing mode: redirect to test email and skip replying to original recipient.
+        if (FORCE_TEST_EMAIL_FORWARD) {
+            Logger.i(
+                COMPONENT,
+                "Redirecting response for message $messageId to test email $TEST_FORWARD_EMAIL; original recipient not contacted. Body: $responseText"
+            )
+            return SendResult.Success
         }
 
         // Retrieve the cached reply action

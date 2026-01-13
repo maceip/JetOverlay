@@ -71,15 +71,24 @@ fun FloatingBubble(
             if (isExpanded) {
                 ExpandedMessageView(
                     uiState = uiState,
-                    onCollapse = { uiState.isExpanded = false }
+                    onCollapse = {
+                        uiState.clearGlow()
+                        uiState.markInteracted()
+                        uiState.isExpanded = false
+                    }
                 )
             } else {
                 CollapsedBubbleView(
-                    onClick = { uiState.isExpanded = true },
+                    onClick = {
+                        uiState.clearGlow()
+                        uiState.markInteracted()
+                        uiState.isExpanded = true
+                    },
                     isProcessing = uiState.isProcessing,
                     isProcessingComplete = uiState.isProcessingComplete,
                     pendingCount = uiState.pendingMessageCount,
-                    bucket = uiState.currentBucket
+                    bucket = uiState.currentBucket,
+                    showGlow = uiState.shouldGlow
                 )
             }
         }
@@ -92,8 +101,21 @@ fun CollapsedBubbleView(
     isProcessing: Boolean = false,
     isProcessingComplete: Boolean = false,
     pendingCount: Int = 0,
-    bucket: MessageBucket = MessageBucket.UNKNOWN
+    bucket: MessageBucket = MessageBucket.UNKNOWN,
+    showGlow: Boolean = false
 ) {
+    val bucketColor = Color(bucket.color)
+    val glowAlpha by animateFloatAsState(
+        targetValue = if (showGlow) 0.45f else 0f,
+        animationSpec = tween(250),
+        label = "glowAlpha"
+    )
+    val glowScale by animateFloatAsState(
+        targetValue = if (showGlow) 1.12f else 1f,
+        animationSpec = tween(250),
+        label = "glowScale"
+    )
+
     // Animation support
     val infiniteTransition = rememberInfiniteTransition(label = "pulse")
     val pulseScale by infiniteTransition.animateFloat(
@@ -110,15 +132,15 @@ fun CollapsedBubbleView(
         modifier = Modifier.size(80.dp), // Larger container for ripple
         contentAlignment = Alignment.Center
     ) {
-        // Glowing Ring (only when pending count > 0)
-        if (pendingCount > 0) {
+        // Glowing Ring (low-profile pulse when attention is needed)
+        if (glowAlpha > 0.01f) {
             Box(
                 modifier = Modifier
                     .size(60.dp)
                     .graphicsLayer {
-                        scaleX = pulseScale
-                        scaleY = pulseScale
-                        alpha = 0.5f
+                        scaleX = pulseScale * glowScale
+                        scaleY = pulseScale * glowScale
+                        alpha = glowAlpha
                     }
                     .clip(CircleShape)
                     .background(Color(0xFF6200EE)) // Purple glow

@@ -32,6 +32,7 @@ import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardCapitalization
 import androidx.compose.ui.unit.dp
+import kotlinx.coroutines.delay
 
 /**
  * Composable for editing a response.
@@ -59,6 +60,7 @@ fun ResponseEditor(
     // Request focus and show keyboard when editor appears
     LaunchedEffect(Unit) {
         focusRequester.requestFocus()
+        delay(120)
         keyboardController?.show()
     }
 

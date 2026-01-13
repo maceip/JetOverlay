@@ -2,6 +2,7 @@ package com.yazan.jetoverlay.api
 
 import android.content.Context
 import android.content.Intent
+import android.util.Log
 import androidx.compose.runtime.Composable
 import com.yazan.jetoverlay.service.OverlayService
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -9,6 +10,8 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 
 object OverlaySdk {
+
+    private const val TAG = "OverlaySdk"
 
     // Registry for multi-module support
     private val registry = java.util.Collections.synchronizedMap(mutableMapOf<String, @Composable (Any?) -> Unit>())
@@ -33,6 +36,18 @@ object OverlaySdk {
     }
 
     /**
+     * Unregister a previously registered composable content provider.
+     */
+    fun unregisterContent(type: String) {
+        registry.remove(type)
+    }
+
+    /**
+     * Check if content is registered for the given type.
+     */
+    fun isContentRegistered(type: String): Boolean = registry.containsKey(type)
+
+    /**
      * Initialize the SDK.
      * @param notificationConfig Optional custom notification settings.
      */
@@ -49,10 +64,13 @@ object OverlaySdk {
             val type = activeOverlay?.config?.type ?: id
 
             val registeredContent = registry[type]
-                ?: throw IllegalStateException("No content registered for overlay type '$type'")
+                ?: run {
+                    Log.w(TAG, "No content registered for overlay type '$type'; rendering empty overlay")
+                    null
+                }
 
             androidx.compose.foundation.layout.Box(modifier = modifier) {
-                registeredContent(payload)
+                registeredContent?.invoke(payload)
             }
         }
     }
@@ -61,7 +79,15 @@ object OverlaySdk {
         _activeOverlays.update { current ->
             current + (config.id to ActiveOverlay(config, payload))
         }
-        startService(context)
+        if (!isContentRegistered(config.type)) {
+            Log.w(TAG, "show() called with unregistered type '${config.type}'")
+        }
+        try {
+            startService(context)
+        } catch (e: Exception) {
+            Log.e(TAG, "Failed to start OverlayService; rolling back overlay id=${config.id}", e)
+            _activeOverlays.update { current -> current - config.id }
+        }
     }
 
     fun hide(id: String) {
@@ -74,6 +100,11 @@ object OverlaySdk {
 
     private fun startService(context: Context) {
         val intent = Intent(context, OverlayService::class.java)
-        context.startForegroundService(intent)
+        try {
+            context.startForegroundService(intent)
+        } catch (e: Exception) {
+            Log.e(TAG, "startForegroundService failed", e)
+            throw e
+        }
     }
 }

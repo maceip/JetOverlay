@@ -9,6 +9,7 @@ import android.content.pm.ServiceInfo
 import android.graphics.PixelFormat
 import android.os.Build
 import android.os.IBinder
+import android.util.Log
 import android.view.Gravity
 import android.view.WindowManager
 import androidx.compose.foundation.gestures.detectDragGestures
@@ -24,6 +25,8 @@ import kotlinx.coroutines.flow.launchIn
 import kotlinx.coroutines.flow.onEach
 
 class OverlayService : Service() {
+
+    private val tag = "OverlayService"
 
     private val windowManager by lazy { getSystemService(WINDOW_SERVICE) as WindowManager }
 
@@ -83,20 +86,22 @@ class OverlayService : Service() {
         
         val currentFlags = params.flags
         val shouldBeFocusable = data.config.isFocusable
-        
+
         // Calculate expected flags based on focusability
         // FLAG_NOT_FOCUSABLE = 8
         val isCurrentlyNotFocusable = (currentFlags and WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE) != 0
-        
+
         var needsUpdate = false
-        
+
         if (shouldBeFocusable && isCurrentlyNotFocusable) {
             // Remove NOT_FOCUSABLE
             params.flags = params.flags and WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE.inv()
+            params.flags = params.flags or WindowManager.LayoutParams.FLAG_ALT_FOCUSABLE_IM
             needsUpdate = true
         } else if (!shouldBeFocusable && !isCurrentlyNotFocusable) {
             // Add NOT_FOCUSABLE
             params.flags = params.flags or WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE
+            params.flags = params.flags and WindowManager.LayoutParams.FLAG_ALT_FOCUSABLE_IM.inv()
             needsUpdate = true
         }
 
@@ -118,12 +123,18 @@ class OverlayService : Service() {
 
         val viewWrapper = OverlayViewWrapper(this)
 
+        var layoutFlags = WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE or
+                WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS
+        if (data.config.isFocusable) {
+            layoutFlags = layoutFlags and WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE.inv()
+            layoutFlags = layoutFlags or WindowManager.LayoutParams.FLAG_ALT_FOCUSABLE_IM
+        }
+
         val params = WindowManager.LayoutParams(
             WindowManager.LayoutParams.WRAP_CONTENT,
             WindowManager.LayoutParams.WRAP_CONTENT,
             WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY,
-            WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE or
-                    WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS,
+            layoutFlags,
             PixelFormat.TRANSLUCENT
         ).apply {
             gravity = Gravity.TOP or Gravity.START
@@ -160,7 +171,9 @@ class OverlayService : Service() {
             viewWrapper.onAttachToWindowCustom()
             activeViews[id] = viewWrapper
         } catch (e: Exception) {
-            e.printStackTrace()
+            Log.e(tag, "Failed to add overlay view for id=$id", e)
+            // Roll back the active overlay state to avoid a stuck FGS with no view
+            OverlaySdk.hide(id)
         }
     }
 
@@ -182,10 +195,10 @@ class OverlayService : Service() {
 
     override fun onDestroy() {
         super.onDestroy()
-        serviceScope.cancel()
         activeViews.keys.toList().forEach { id ->
             removeOverlay(id)
         }
+        serviceScope.cancel()
     }
 
     private fun startForegroundNotification() {

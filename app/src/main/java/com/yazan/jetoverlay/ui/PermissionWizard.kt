@@ -89,6 +89,8 @@ fun PermissionWizard(
     // Get all permissions to request (required first)
     val allPermissions = remember { RequiredPermission.allRequired() + RequiredPermission.allOptional() }
     val requiredCount = RequiredPermission.allRequired().size
+    val optionalStartIndex = requiredCount
+    val lastIndex = allPermissions.lastIndex
 
     // Track permission statuses
     var permissionStatuses by remember {
@@ -101,7 +103,7 @@ fun PermissionWizard(
     // Calculate progress
     val grantedCount = permissionStatuses.count { it }
     val progress by animateFloatAsState(
-        targetValue = grantedCount.toFloat() / requiredCount.toFloat(),
+        targetValue = if (requiredCount == 0) 1f else grantedCount.toFloat() / requiredCount.toFloat(),
         animationSpec = tween(300),
         label = "progress"
     )
@@ -138,26 +140,24 @@ fun PermissionWizard(
         onPauseOrDispose { }
     }
 
-    // Auto-advance when current permission is granted
-    LaunchedEffect(permissionStatuses) {
-        if (currentStepIndex < allPermissions.size && permissionStatuses[currentStepIndex]) {
-            // Current permission granted, move to next
-            val nextMissing = permissionStatuses.indexOfFirst { !it }
-            if (nextMissing != -1 && nextMissing < allPermissions.size) {
-                currentStepIndex = nextMissing
-            } else if (allRequiredGranted) {
-                // All required granted
+    // Auto-advance required permissions; optional steps move forward only, never backward.
+    LaunchedEffect(permissionStatuses, currentStepIndex) {
+        if (currentStepIndex < requiredCount && permissionStatuses[currentStepIndex]) {
+            val nextMissingRequired = permissionStatuses.take(requiredCount).indexOfFirst { !it }
+            if (nextMissingRequired != -1) {
+                currentStepIndex = nextMissingRequired
+            } else {
                 onAllPermissionsGranted()
             }
+        } else if (currentStepIndex >= optionalStartIndex && currentStepIndex <= lastIndex) {
+            if (permissionStatuses[currentStepIndex]) {
+                if (currentStepIndex == lastIndex) {
+                    onSkipOptional()
+                } else {
+                    currentStepIndex = (currentStepIndex + 1).coerceAtMost(lastIndex)
+                }
+            }
         }
-    }
-
-    // Final Completion Screen
-    if (wizardCompleted) {
-        FinalCompletionScreen(
-            onStart = onAllPermissionsGranted
-        )
-        return
     }
 
     Column(
@@ -375,6 +375,7 @@ fun FinalCompletionScreen(onStart: () -> Unit) {
             Text("Start", style = MaterialTheme.typography.titleMedium)
         }
     }
+}
 
 @Composable
 private fun ProgressSection(

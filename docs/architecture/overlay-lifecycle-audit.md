@@ -294,12 +294,17 @@ private val store = ViewModelStore()
 
 | Issue | Severity | Component | Type |
 |-------|----------|-----------|------|
-| Race condition in onDestroy | MEDIUM | OverlayService | Bug |
-| Silent exception swallowing | LOW-MEDIUM | OverlayService | Reliability |
-| Memory leak in registry | MEDIUM | OverlaySdk | Memory |
+| Race condition in onDestroy | MEDIUM (addressed: cleanup before cancel) | OverlayService | Bug |
+| Silent exception swallowing | LOW-MEDIUM (partially mitigated: addView rollback) | OverlayService | Reliability |
+| Memory leak in registry | MEDIUM (mitigated: unregisterContent added) | OverlaySdk | Memory |
 | Unsynchronized params mutation | LOW | OverlayService | Thread Safety |
 | No overlay bounds checking | LOW | OverlayService | UX |
 | ViewModelStore not restored | LOW | OverlayViewWrapper | Expected Behavior |
+
+### 2026-01-13 updates
+- OverlayService: reordered `onDestroy()` to remove overlays before cancelling scope; adds IME-focus flag toggling when overlays become focusable for the editor flow.
+- OverlayService: addView failures now log and roll back active overlay state to prevent stuck FGS with no windows.
+- OverlaySdk: content factory now tolerates missing registrations (no crash, logs warning); startForegroundService wrapped with rollback on failure; registry gains `unregisterContent`/`isContentRegistered`.
 
 ---
 
