@@ -147,8 +147,8 @@ fun OverlayControlPanel(modifier: Modifier = Modifier) {
                     config = OverlayConfig(
                         id = "agent_bubble",
                         type = "overlay_1",
-                        initialX = 100,
-                        initialY = 300
+                        initialX = 0,
+                        initialY = 120
                     )
                 )
             }
@@ -378,8 +378,8 @@ private fun MainControlPanel(
                         config = OverlayConfig(
                             id = "agent_bubble",
                             type = "overlay_1",
-                            initialX = 100,
-                            initialY = 300
+                            initialX = 0,
+                            initialY = 120
                         )
                     )
                 }

@@ -28,7 +28,10 @@
                 <action android:name="android.intent.action.VIEW" />
                 <category android:name="android.intent.category.DEFAULT" />
                 <category android:name="android.intent.category.BROWSABLE" />
-                <data android:scheme="jetoverlay" android:host="slack-callback" />
+                <data
+                    android:scheme="jetoverlay"
+                    android:host="slack"
+                    android:path="/oauth" />
             </intent-filter>
         </activity>
 

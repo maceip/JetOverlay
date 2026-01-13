@@ -61,6 +61,7 @@ dependencies {
     implementation(libs.androidx.lifecycle.runtime.ktx)
     implementation(libs.androidx.lifecycle.viewmodel.ktx) // For ViewModelStore
     implementation(libs.androidx.savedstate.ktx)          // For SavedStateRegistry
+    implementation("androidx.lifecycle:lifecycle-process:2.10.0") // For ProcessLifecycleOwner
 
     testImplementation(libs.junit)
     androidTestImplementation(libs.androidx.junit)

@@ -92,6 +92,10 @@ fun PermissionWizard(
     val optionalStartIndex = requiredCount
     val lastIndex = allPermissions.lastIndex
 
+    // Track which optional permissions have been explicitly handled (granted or skipped)
+    var handledOptionalIndices by remember { mutableStateOf(setOf<Int>()) }
+    var optionalFinished by remember { mutableStateOf(false) }
+
     // Track permission statuses
     var permissionStatuses by remember {
         mutableStateOf(allPermissions.map { permissionManager.isPermissionGranted(it) })
@@ -142,6 +146,8 @@ fun PermissionWizard(
 
     // Auto-advance required permissions; optional steps move forward only, never backward.
     LaunchedEffect(permissionStatuses, currentStepIndex) {
+        if (optionalFinished) return@LaunchedEffect
+
         if (currentStepIndex < requiredCount && permissionStatuses[currentStepIndex]) {
             val nextMissingRequired = permissionStatuses.take(requiredCount).indexOfFirst { !it }
             if (nextMissingRequired != -1) {
@@ -151,10 +157,15 @@ fun PermissionWizard(
             }
         } else if (currentStepIndex >= optionalStartIndex && currentStepIndex <= lastIndex) {
             if (permissionStatuses[currentStepIndex]) {
-                if (currentStepIndex == lastIndex) {
-                    onSkipOptional()
+                handledOptionalIndices = handledOptionalIndices + currentStepIndex
+                val nextPending = (optionalStartIndex..lastIndex)
+                    .firstOrNull { it !in handledOptionalIndices && !permissionStatuses[it] }
+
+                if (nextPending != null) {
+                    currentStepIndex = nextPending
                 } else {
-                    currentStepIndex = (currentStepIndex + 1).coerceAtMost(lastIndex)
+                    optionalFinished = true
+                    onSkipOptional()
                 }
             }
         }
@@ -275,10 +286,14 @@ fun PermissionWizard(
                         onSkip = if (stepIndex >= requiredCount) {
                             {
                                 // Skip logic: Advance to next step regardless of grant status
-                                if (currentStepIndex < allPermissions.size - 1) {
-                                    currentStepIndex++
+                                handledOptionalIndices = handledOptionalIndices + stepIndex
+                                val nextPending = (optionalStartIndex..lastIndex)
+                                    .firstOrNull { it !in handledOptionalIndices && !permissionStatuses[it] }
+
+                                if (nextPending != null) {
+                                    currentStepIndex = nextPending
                                 } else {
-                                    // Finished last optional step
+                                    optionalFinished = true
                                     onSkipOptional()
                                 }
                             }
@@ -293,12 +308,18 @@ fun PermissionWizard(
         // Manual Navigation Buttons (to prevent getting stuck)
         if (isInOptionalSection) {
             Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                if (currentStepIndex < allPermissions.size - 1) {
-                    TextButton(onClick = { currentStepIndex++ }) {
+                val nextPending = (optionalStartIndex..lastIndex)
+                    .firstOrNull { it !in handledOptionalIndices && !permissionStatuses[it] }
+
+                if (nextPending != null && nextPending <= lastIndex) {
+                    TextButton(onClick = { currentStepIndex = nextPending }) {
                         Text("Next")
                     }
                 } else {
-                     Button(onClick = onSkipOptional) {
+                     Button(onClick = {
+                         optionalFinished = true
+                         onSkipOptional()
+                     }) {
                         Text("Finish")
                     }
                 }

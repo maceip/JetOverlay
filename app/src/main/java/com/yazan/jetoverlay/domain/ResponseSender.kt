@@ -3,6 +3,7 @@ package com.yazan.jetoverlay.domain
 import android.app.PendingIntent
 import android.content.Context
 import android.content.Intent
+import android.net.Uri
 import android.os.Bundle
 import android.service.notification.NotificationListenerService
 import androidx.core.app.RemoteInput
@@ -57,11 +58,7 @@ class ResponseSender(private val context: Context) {
 
         // Testing mode: redirect to test email and skip replying to original recipient.
         if (FORCE_TEST_EMAIL_FORWARD) {
-            Logger.i(
-                COMPONENT,
-                "Redirecting response for message $messageId to test email $TEST_FORWARD_EMAIL; original recipient not contacted. Body: $responseText"
-            )
-            return SendResult.Success
+            return forwardToTestMailbox(messageId, responseText)
         }
 
         // Retrieve the cached reply action
@@ -111,6 +108,40 @@ class ResponseSender(private val context: Context) {
         } catch (e: Exception) {
             Logger.e(COMPONENT, "Failed to send response", e)
             SendResult.Error("Failed to send response: ${e.message}")
+        }
+    }
+
+    private fun forwardToTestMailbox(messageId: Long, responseText: String): SendResult {
+        Logger.i(
+            COMPONENT,
+            "Redirecting response for message $messageId to test email $TEST_FORWARD_EMAIL; original recipient not contacted. Body: $responseText"
+        )
+
+        // Persist a local log for auditing
+        try {
+            val output = context.openFileOutput("test_email_forward.log", Context.MODE_APPEND)
+            output.use { stream ->
+                stream.write("message=$messageId\n".toByteArray())
+                stream.write("to=$TEST_FORWARD_EMAIL\n".toByteArray())
+                stream.write("body=$responseText\n---\n".toByteArray())
+            }
+        } catch (e: Exception) {
+            Logger.w(COMPONENT, "Failed to write local forward log", e)
+        }
+
+        // Attempt to launch an email intent for manual review; safe to fail silently in background.
+        return try {
+            val intent = Intent(Intent.ACTION_SENDTO).apply {
+                data = Uri.parse("mailto:$TEST_FORWARD_EMAIL")
+                putExtra(Intent.EXTRA_SUBJECT, "JetOverlay test message #$messageId")
+                putExtra(Intent.EXTRA_TEXT, responseText)
+                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+            }
+            context.startActivity(intent)
+            SendResult.Success
+        } catch (e: Exception) {
+            Logger.w(COMPONENT, "Could not launch email client for forwarding", e)
+            SendResult.Success
         }
     }
 

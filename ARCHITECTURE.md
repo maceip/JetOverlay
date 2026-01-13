@@ -37,10 +37,10 @@ JetOverlay is an Android "social intelligence agent." Incoming notifications, ca
 5. Update: Record is updated to `PROCESSED` (or domain-specific status) with veil and responses.
 
 ### D. Rendering
-1. Service: `OverlayService` (in `jetoverlay`) runs as a foreground service and owns the `WindowManager`.
-2. Composition: `OverlaySdk` resolves the registered composable for the overlay id.
+1. Service: `OverlayService` (in `jetoverlay`) runs as a foreground service and owns the `WindowManager`; addView failures roll back SDK state and stop the service if nothing is showing.
+2. Composition: `OverlaySdk` resolves the registered composable for the overlay id (registry is weak-referenced/pruned; missing content renders a no-op instead of crashing).
 3. Observation: UI (`FloatingBubble`, `AgentOverlay`, etc.) collects messages from the repository and wraps in `OverlayUiState`.
-4. Interaction: Collapsed bubble -> expanded veil -> user reveal shows `originalContent`; responses can be sent via `ResponseSender` using cached reply intents.
+4. Interaction: Collapsed bottom-center “tic-tac” bar glows while processing; double-tap expands an inline sheet (no modal dialog) with veil + suggestions; responses dispatch through `ResponseSender`.
 
 ## 4. Key Components (by package)
 - `com.yazan.jetoverlay.api`: `OverlaySdk`, `OverlayConfig`, `OverlayNotificationConfig`.
@@ -53,11 +53,12 @@ JetOverlay is an Android "social intelligence agent." Incoming notifications, ca
 ## 5. Critical Workflows
 - Veil and Smart Replies: `MessageProcessor` drives veil text and candidate replies before UI reveal to reduce anxiety.
 - Reply Path: User picks a response in the overlay; `ResponseSender` uses `ReplyActionCache` or integration clients to dispatch and updates message status to `SENT` or `DISMISSED`.
-- Response Editing: Tapping a suggested reply opens the editor (requests focus/IME); Regenerate uses the LLM service (LiteRT/Stub) to refresh suggestions in-place; Send dispatches the cached notification reply and marks the message `SENT` locally even if the upstream action fails.
+- Response Editing: Tapping a suggested reply opens the inline editor (requests focus/IME); Regenerate uses the LLM service (LiteRT/Stub) to refresh suggestions in-place; Send dispatches via `ResponseSender` and collapses the sheet.
+- Auto-Respond: After processing completes, the overlay glows for ~5s; if the user does not interact, the first generated reply is auto-sent (currently forwarded to the test mailbox, not the original recipient).
 - Permission Flow: Overlay lives in a service context; activities are started with `FLAG_ACTIVITY_NEW_TASK`. Permissions for overlays, notifications, calls, audio, and phone state are orchestrated through onboarding and the permission wizard.
 - Onboarding Flow: After permissions (including optional call/SMS) the wizard advances to a final “auto mode” screen (purple overlay preview) with a Start button that completes onboarding.
 - Resilience: Foreground service plus SDK re-registering overlays ensures survival across process death; `IntegrationSyncWorker` repairs integrations after restarts.
-- Overlay Safety: Missing content registrations now render a no-op overlay with a warning; failed overlay creation rolls back SDK state to avoid stuck foreground services; service start failures roll back `show()` state.
+- Overlay Safety: Missing content registrations render a no-op overlay with a warning; failed overlay creation rolls back SDK state and stops the service if empty; service start failures roll back `show()` state.
 
 ## 6. Known Limitations / Risks
 1. SDK initialization must happen in `Application.onCreate` so services and UI share the same registry.
@@ -65,3 +66,4 @@ JetOverlay is an Android "social intelligence agent." Incoming notifications, ca
 3. Foldable/multi-window coordinates need careful handling to avoid off-screen overlays when display configuration changes.
 4. Overlay glow is intentionally low-profile; ensure future visual changes keep it unobtrusive for accessibility.
 5. Auto-reply sends the first generated response after ~5 seconds of inactivity if the user does not interact; ensure reply actions remain cached or guard when absent. Outgoing replies are currently redirected to test email `730011799396-0001@t-online.de` (no delivery to original recipients) for validation.
+6. LiteRT model is resolved by `ModelManager` at `/data/local/tmp/gemma-3n-E4B-it-int4.litertlm` (see `scripts/push_model.ps1` when reloading devices).

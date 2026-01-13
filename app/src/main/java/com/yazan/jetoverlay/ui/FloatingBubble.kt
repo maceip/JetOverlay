@@ -1,6 +1,7 @@
 package com.yazan.jetoverlay.ui
 
 import android.util.Log
+import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.ExperimentalAnimationApi
 import androidx.compose.animation.fadeIn
@@ -31,6 +32,8 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.KeyboardActions
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ChatBubble
 import androidx.compose.material.icons.filled.Check
@@ -45,6 +48,9 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.shadow
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
@@ -52,7 +58,9 @@ import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
@@ -74,6 +82,10 @@ fun FloatingBubble(
     val context = LocalContext.current
     var showDetail by remember { mutableStateOf(false) }
 
+    LaunchedEffect(uiState.message.id) {
+        showDetail = false
+    }
+
     // Always-on collapsed "tic tac" overlay that only responds to double taps
     Box(modifier = modifier) {
         CollapsedStatusOverlay(
@@ -82,27 +94,27 @@ fun FloatingBubble(
                 uiState.markInteracted()
                 uiState.clearGlow()
                 if (uiState.message.status !in listOf("IDLE", "SENT", "DISMISSED")) {
-            showDetail = true
-        } else {
-            // Launch settings/control panel when idle
-            val intent = android.content.Intent(
-                context,
-                com.yazan.jetoverlay.MainActivity::class.java
-            ).apply { flags = android.content.Intent.FLAG_ACTIVITY_NEW_TASK }
-            context.startActivity(intent)
-        }
-    }
+                    showDetail = true
+                } else {
+                    // Launch settings/control panel when idle
+                    val intent = android.content.Intent(
+                        context,
+                        com.yazan.jetoverlay.MainActivity::class.java
+                    ).apply { flags = android.content.Intent.FLAG_ACTIVITY_NEW_TASK }
+                    context.startActivity(intent)
+                }
+            }
         )
-    }
 
-    if (showDetail) {
-        DetailBottomSheet(
+        InlineDetailSheet(
+            visible = showDetail,
             uiState = uiState,
             onDismiss = {
                 uiState.markInteracted()
                 uiState.clearGlow()
                 showDetail = false
-            }
+            },
+            modifier = Modifier.align(Alignment.BottomCenter)
         )
     }
 }
@@ -154,68 +166,149 @@ private fun CollapsedStatusOverlay(
     }
 }
 
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun DetailBottomSheet(
+private fun InlineDetailSheet(
+    visible: Boolean,
     uiState: OverlayUiState,
-    onDismiss: () -> Unit
+    onDismiss: () -> Unit,
+    modifier: Modifier = Modifier
 ) {
-    val bottomSheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
-    ModalBottomSheet(
-        onDismissRequest = onDismiss,
-        sheetState = bottomSheetState
+    val focusRequester = remember { FocusRequester() }
+    val keyboardController = LocalSoftwareKeyboardController.current
+
+    LaunchedEffect(uiState.isEditing) {
+        if (uiState.isEditing) {
+            focusRequester.requestFocus()
+        }
+    }
+
+    AnimatedVisibility(
+        visible = visible,
+        enter = slideInVertically { it } + fadeIn(),
+        exit = slideOutVertically { it } + fadeOut(),
+        modifier = modifier
     ) {
-        Column(
+        Surface(
             modifier = Modifier
-                .fillMaxWidth()
-                .padding(16.dp),
-            verticalArrangement = Arrangement.spacedBy(12.dp)
+                .padding(bottom = 8.dp)
+                .widthIn(max = 420.dp)
+                .shadow(12.dp, RoundedCornerShape(topStart = 24.dp, topEnd = 24.dp)),
+            shape = RoundedCornerShape(topStart = 24.dp, topEnd = 24.dp),
+            tonalElevation = 8.dp,
+            color = MaterialTheme.colorScheme.surface
         ) {
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(12.dp)
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(16.dp),
+                verticalArrangement = Arrangement.spacedBy(12.dp)
             ) {
-                AppIconBadge(packageName = uiState.message.packageName)
-                Column {
-                    Text("Incoming message", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
-                    Text(uiState.message.packageName, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
+                    AppIconBadge(packageName = uiState.message.packageName)
+                    Column {
+                        Text("Incoming message", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
+                        Text(
+                            uiState.message.packageName.ifBlank { "System" },
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                    Spacer(modifier = Modifier.weight(1f))
+                    IconButton(onClick = onDismiss) {
+                        Icon(Icons.Default.Close, contentDescription = "Close sheet")
+                    }
                 }
-                Spacer(modifier = Modifier.weight(1f))
-                IconButton(onClick = onDismiss) {
-                    Icon(Icons.Default.Close, contentDescription = "Close sheet")
+
+                Text(
+                    text = uiState.message.veiledContent ?: "Message veiled",
+                    style = MaterialTheme.typography.bodyLarge,
+                    fontWeight = FontWeight.Medium
+                )
+
+                if (uiState.message.generatedResponses.isNotEmpty()) {
+                    Text(
+                        text = "Suggestions",
+                        style = MaterialTheme.typography.titleSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .horizontalScroll(rememberScrollState()),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        uiState.message.generatedResponses.forEachIndexed { index, suggestion ->
+                            AssistChip(
+                                onClick = { uiState.selectResponse(index) },
+                                label = { Text(suggestion.take(60)) },
+                                colors = AssistChipDefaults.assistChipColors(
+                                    containerColor = if (uiState.selectedResponseIndex == index) {
+                                        MaterialTheme.colorScheme.primaryContainer
+                                    } else {
+                                        MaterialTheme.colorScheme.surfaceVariant
+                                    }
+                                )
+                            )
+                        }
+                    }
                 }
-            }
 
-            Text(
-                text = uiState.message.veiledContent ?: "Message veiled",
-                style = MaterialTheme.typography.bodyLarge,
-                fontWeight = FontWeight.Medium
-            )
+                if (uiState.isEditing) {
+                    OutlinedTextField(
+                        value = uiState.editedResponse,
+                        onValueChange = { uiState.updateEditedResponse(it) },
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .focusRequester(focusRequester),
+                        placeholder = { Text("Edit response") },
+                        keyboardOptions = KeyboardOptions.Default.copy(imeAction = ImeAction.Done),
+                        keyboardActions = KeyboardActions(
+                            onDone = {
+                                uiState.useEditedResponse()
+                                uiState.sendSelectedResponse()
+                                keyboardController?.hide()
+                                onDismiss()
+                            }
+                        )
+                    )
+                } else {
+                    val responsePreview = uiState.selectedResponse ?: uiState.message.generatedResponses.firstOrNull() ?: "No generated response yet."
+                    Text(
+                        text = "Suggested response:\n$responsePreview",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
 
-            val responsePreview = uiState.selectedResponse ?: uiState.message.generatedResponses.firstOrNull() ?: "No generated response yet."
-            Text(
-                text = "Suggested response:\n$responsePreview",
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
-            )
-
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
-                OutlinedButton(
-                    onClick = { uiState.startEditing() },
-                    modifier = Modifier.weight(1f)
-                ) { Text("Edit") }
-                OutlinedButton(
-                    onClick = { uiState.regenerateResponses() },
-                    modifier = Modifier.weight(1f)
-                ) { Text("Regenerate") }
-                Button(
-                    onClick = { uiState.sendSelectedResponse() },
-                    modifier = Modifier.weight(1f),
-                    enabled = uiState.hasSelectedResponse
-                ) { Text("Send") }
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    OutlinedButton(
+                        onClick = { uiState.startEditing() },
+                        modifier = Modifier.weight(1f)
+                    ) { Text("Edit") }
+                    OutlinedButton(
+                        onClick = {
+                            uiState.regenerateResponses()
+                        },
+                        modifier = Modifier.weight(1f)
+                    ) { Text("Regenerate") }
+                    Button(
+                        onClick = {
+                            if (uiState.isEditing) {
+                                uiState.useEditedResponse()
+                            }
+                            uiState.sendSelectedResponse()
+                            onDismiss()
+                        },
+                        modifier = Modifier.weight(1f),
+                        enabled = uiState.hasSelectedResponse
+                    ) { Text("Send") }
+                }
             }
         }
     }

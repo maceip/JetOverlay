@@ -135,9 +135,9 @@ class OverlayService : Service() {
             layoutFlags,
             PixelFormat.TRANSLUCENT
         ).apply {
-            gravity = Gravity.TOP or Gravity.START
-            x = data.config.initialX
-            y = data.config.initialY
+            gravity = Gravity.BOTTOM or Gravity.CENTER_HORIZONTAL
+            x = 0
+            y = if (data.config.initialY != 0) data.config.initialY else 120
         }
 
         viewWrapper.setContent {
@@ -156,6 +156,9 @@ class OverlayService : Service() {
             Log.e(tag, "Failed to add overlay view for id=$id", e)
             // Roll back the active overlay state to avoid a stuck FGS with no view
             OverlaySdk.hide(id)
+            if (activeViews.isEmpty()) {
+                stopSelf()
+            }
         }
     }
 

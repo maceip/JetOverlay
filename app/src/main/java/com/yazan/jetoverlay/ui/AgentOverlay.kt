@@ -188,8 +188,8 @@ fun AgentOverlay(
         val config = com.yazan.jetoverlay.api.OverlayConfig(
             id = "agent_bubble",
             type = "overlay_1",
-            initialX = 100,
-            initialY = 300,
+            initialX = 0,
+            initialY = 120,
             isFocusable = uiState.isEditing // Toggle focus based on editing state
         )
         // Re-show with updated config to trigger service update
@@ -278,7 +278,6 @@ fun AgentOverlay(
             "RECEIVED" -> uiState.setProcessing()
             "GENERATED", "VEILED", "PROCESSED" -> {
                 uiState.setProcessingComplete()
-                uiState.clearGlow()
                 if (!uiState.userInteracted && targetMessage.id != 0L) {
                     cancelAutoReply()
                     autoReplyJob.value = scope.launch {
