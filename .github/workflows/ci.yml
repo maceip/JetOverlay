@@ -54,6 +54,10 @@ jobs:
           api-level: 34
           target: google_apis
           arch: x86_64
+          profile: pixel_6
+          emulator-options: -no-window -no-audio -no-boot-anim -gpu swiftshader_indirect -no-snapshot -accel off
+          disable-animations: true
+          force-avd-creation: true
           script: ./gradlew :app:connectedDebugAndroidTest -Pandroid.testInstrumentationRunnerArguments.class=com.yazan.jetoverlay.MessagePipelineUnifiedE2ETest
 
       - name: Assemble debug APK
