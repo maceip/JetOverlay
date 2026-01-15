@@ -11,7 +11,7 @@ permissions:
 
 jobs:
   test_build_sign:
-    runs-on: macos-13
+    runs-on: ubuntu-latest
     timeout-minutes: 45
     steps:
       - name: Checkout
@@ -28,6 +28,11 @@ jobs:
 
       - name: Install Build Tools
         run: sdkmanager "build-tools;34.0.0"
+
+      - name: Reset adb
+        run: |
+          adb kill-server || true
+          adb start-server || true
 
       - name: Configure Gradle cache
         uses: gradle/gradle-build-action@v3
@@ -50,6 +55,8 @@ jobs:
 
       - name: Run instrumentation test (MessagePipelineUnifiedE2ETest)
         uses: reactivecircus/android-emulator-runner@v2
+        env:
+          ANDROID_ADB_SERVER_PORT: 5038
         with:
           api-level: 34
           target: google_apis
@@ -92,5 +99,11 @@ jobs:
         with:
           name: app-debug-signed
           path: app/build/outputs/apk/debug/app-debug-signed.apk
+
+
+
+
+
+
 
 
