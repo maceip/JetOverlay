@@ -7,6 +7,14 @@ plugins {
     alias(libs.plugins.ksp)
 }
 
+fun Project.propOrEnv(key: String, defaultValue: String = ""): String {
+    val prop = (findProperty(key) as? String)?.takeIf { it.isNotBlank() }
+    val env = System.getenv(key)?.takeIf { it.isNotBlank() }
+    return (prop ?: env ?: defaultValue).toString()
+}
+
+fun String.asBuildConfigString(): String = "\"${this.replace("\"", "\\\"")}\""
+
 android {
     namespace = "com.yazan.jetoverlay.app"
     compileSdk = 36
@@ -19,6 +27,25 @@ android {
         versionName = "1.0"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
+
+        val gmailRedirect = propOrEnv("GMAIL_REDIRECT_URI", "jetoverlay://email-callback")
+        val notionRedirect = propOrEnv("NOTION_REDIRECT_URI", "jetoverlay://notion-callback")
+        val githubRedirect = propOrEnv("GITHUB_REDIRECT_URI", "jetoverlay://github-callback")
+
+        buildConfigField("String", "GMAIL_CLIENT_ID", propOrEnv("GMAIL_CLIENT_ID").asBuildConfigString())
+        buildConfigField("String", "GMAIL_CLIENT_SECRET", propOrEnv("GMAIL_CLIENT_SECRET").asBuildConfigString())
+        buildConfigField("String", "GMAIL_REDIRECT_URI", gmailRedirect.asBuildConfigString())
+
+        buildConfigField("String", "NOTION_CLIENT_ID", propOrEnv("NOTION_CLIENT_ID").asBuildConfigString())
+        buildConfigField("String", "NOTION_CLIENT_SECRET", propOrEnv("NOTION_CLIENT_SECRET").asBuildConfigString())
+        buildConfigField("String", "NOTION_REDIRECT_URI", notionRedirect.asBuildConfigString())
+
+        buildConfigField("String", "GITHUB_CLIENT_ID", propOrEnv("GITHUB_CLIENT_ID").asBuildConfigString())
+        buildConfigField("String", "GITHUB_CLIENT_SECRET", propOrEnv("GITHUB_CLIENT_SECRET").asBuildConfigString())
+        buildConfigField("String", "GITHUB_REDIRECT_URI", githubRedirect.asBuildConfigString())
+
+        buildConfigField("String", "SLACK_CLIENT_ID", propOrEnv("SLACK_CLIENT_ID").asBuildConfigString())
+        buildConfigField("String", "SLACK_CLIENT_SECRET", propOrEnv("SLACK_CLIENT_SECRET").asBuildConfigString())
     }
 
     buildTypes {
@@ -37,10 +64,12 @@ android {
     kotlin {
         compilerOptions {
             jvmTarget = JvmTarget.JVM_18
+            freeCompilerArgs.add("-Xreturn-value-checker=check")
         }
     }
     buildFeatures {
         compose = true
+        buildConfig = true
     }
     testOptions {
         unitTests.isReturnDefaultValues = true
@@ -69,9 +98,14 @@ dependencies {
     implementation(libs.androidx.material.icons.core)
     implementation(libs.androidx.material.icons.extended)
     implementation("org.jetbrains.kotlin:kotlin-reflect")
+    implementation("com.github.skydoves:flexible-bottomsheet-material3:0.2.0")
 
     // LiteRT-LM
     implementation(libs.litertlm.android)
+
+    // Images / SVG loading
+    implementation("io.coil-kt:coil-compose:2.6.0")
+    implementation("io.coil-kt:coil-svg:2.6.0")
 
     testImplementation(libs.junit)
     testImplementation(libs.kotlinx.coroutines.test)

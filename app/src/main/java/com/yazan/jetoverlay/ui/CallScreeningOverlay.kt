@@ -259,7 +259,7 @@ private fun ScreeningCard(
 ) {
     val pulseAlpha by animateFloatAsState(
         targetValue = 1f,
-        animationSpec = tween(durationMillis = 1000),
+        animationSpec = tween(durationMillis = 400),
         label = "pulse"
     )
 

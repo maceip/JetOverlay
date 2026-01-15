@@ -186,6 +186,22 @@ class PermissionManager(private val context: Context) {
     }
 
     /**
+     * Check if call screening role is available on this device.
+     */
+    fun isCallScreeningRoleAvailable(): Boolean {
+        return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+            try {
+                val roleManager = context.getSystemService(android.app.role.RoleManager::class.java)
+                roleManager.isRoleAvailable(android.app.role.RoleManager.ROLE_CALL_SCREENING)
+            } catch (e: Exception) {
+                false
+            }
+        } else {
+            false
+        }
+    }
+
+    /**
      * Check if SMS permissions are granted.
      */
     fun hasSmsPermissions(): Boolean {
@@ -371,11 +387,14 @@ class PermissionManager(private val context: Context) {
         return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
             try {
                 val roleManager = context.getSystemService(android.app.role.RoleManager::class.java)
-                roleManager?.createRequestRoleIntent(android.app.role.RoleManager.ROLE_CALL_SCREENING)
-                    ?: Intent(Settings.ACTION_MANAGE_DEFAULT_APPS_SETTINGS)
+                if (roleManager != null && roleManager.isRoleAvailable(android.app.role.RoleManager.ROLE_CALL_SCREENING)) {
+                    roleManager.createRequestRoleIntent(android.app.role.RoleManager.ROLE_CALL_SCREENING)
+                } else {
+                    null
+                }
             } catch (e: Exception) {
                 Logger.e("PermissionManager", "Error getting role intent", e)
-                Intent(Settings.ACTION_MANAGE_DEFAULT_APPS_SETTINGS)
+                null
             }
         } else {
             null

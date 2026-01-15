@@ -82,7 +82,8 @@ class SmsIntegration : BroadcastReceiver() {
                 val id = repository.ingestNotification(
                     packageName = SMS_PACKAGE_NAME,
                     sender = sender,
-                    content = content
+                    content = content,
+                    threadKey = "$SMS_PACKAGE_NAME:${sender.lowercase()}"
                 )
 
                 Log.d(TAG, "SMS ingested with ID=$id from sender=$sender")
@@ -91,14 +92,15 @@ class SmsIntegration : BroadcastReceiver() {
                 launch(Dispatchers.Main) {
                     if (!com.yazan.jetoverlay.api.OverlaySdk.isOverlayActive("agent_bubble")) {
                         Log.d(TAG, "Triggering overlay for SMS message")
-                        com.yazan.jetoverlay.api.OverlaySdk.show(
+                        com.yazan.jetoverlay.util.OverlayLaunchCoordinator.requestOverlay(
                             context = context,
                             config = com.yazan.jetoverlay.api.OverlayConfig(
                                 id = "agent_bubble",
                                 type = "overlay_1",
                                 initialX = 0,
                                 initialY = 120
-                            )
+                            ),
+                            source = "sms_receiver"
                         )
                     }
                 }

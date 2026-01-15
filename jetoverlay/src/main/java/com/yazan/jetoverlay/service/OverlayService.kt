@@ -36,6 +36,7 @@ class OverlayService : Service() {
 
     override fun onCreate() {
         super.onCreate()
+        Log.i(tag, "Service onCreate; starting foreground and observing overlays")
         startForegroundNotification()
         observeOverlays()
     }
@@ -46,7 +47,13 @@ class OverlayService : Service() {
 
     private fun observeOverlays() {
         OverlaySdk.activeOverlays.onEach { overlayMap ->
-            synchronizeViews(overlayMap)
+            Log.i(tag, "Active overlay state changed: requested=${overlayMap.keys}")
+            try {
+                synchronizeViews(overlayMap)
+            } catch (t: Throwable) {
+                Log.e(tag, "Overlay synchronization crashed; keeping service alive", t)
+                OverlaySdk.reportOverlayError("OverlayService", "Synchronization failed", t)
+            }
         }.launchIn(serviceScope)
     }
 
@@ -96,11 +103,13 @@ class OverlayService : Service() {
             params.flags = params.flags and WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE.inv()
             params.flags = params.flags or WindowManager.LayoutParams.FLAG_ALT_FOCUSABLE_IM
             needsUpdate = true
+            Log.i(tag, "Updating overlay focusability: id=$id -> focusable")
         } else if (!shouldBeFocusable && !isCurrentlyNotFocusable) {
             // Add NOT_FOCUSABLE
             params.flags = params.flags or WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE
             params.flags = params.flags and WindowManager.LayoutParams.FLAG_ALT_FOCUSABLE_IM.inv()
             needsUpdate = true
+            Log.i(tag, "Updating overlay focusability: id=$id -> not focusable")
         }
 
         // Ensure position is synced if changed (though drag handles this mostly)
@@ -122,7 +131,8 @@ class OverlayService : Service() {
         val viewWrapper = OverlayViewWrapper(this)
 
         var layoutFlags = WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE or
-                WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS
+                WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS or
+                WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN
         if (data.config.isFocusable) {
             layoutFlags = layoutFlags and WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE.inv()
             layoutFlags = layoutFlags or WindowManager.LayoutParams.FLAG_ALT_FOCUSABLE_IM
@@ -137,7 +147,8 @@ class OverlayService : Service() {
         ).apply {
             gravity = Gravity.BOTTOM or Gravity.CENTER_HORIZONTAL
             x = 0
-            y = if (data.config.initialY != 0) data.config.initialY else 120
+            // Keep y at 0 so it sits exactly on the bottom inset; avoid accidental off-screen offsets.
+            y = 0
         }
 
         viewWrapper.setContent {
@@ -152,8 +163,10 @@ class OverlayService : Service() {
             windowManager.addView(viewWrapper, params)
             viewWrapper.onAttachToWindowCustom()
             activeViews[id] = viewWrapper
+            Log.i(tag, "Overlay added: id=$id, type=${data.config.type}, pos=(${params.x}, ${params.y}), flags=${params.flags}, focusable=${data.config.isFocusable}")
         } catch (e: Exception) {
             Log.e(tag, "Failed to add overlay view for id=$id", e)
+            OverlaySdk.reportOverlayError("OverlayService", "Failed to add overlay view for id=$id", e)
             // Roll back the active overlay state to avoid a stuck FGS with no view
             OverlaySdk.hide(id)
             if (activeViews.isEmpty()) {
@@ -167,6 +180,7 @@ class OverlayService : Service() {
             try {
                 view.onDetachFromWindowCustom()
                 windowManager.removeView(view)
+                Log.i(tag, "Overlay removed: id=$id")
             } catch (e: Exception) {
                 // View might already be detached, ignore.
                 e.printStackTrace()
@@ -174,12 +188,14 @@ class OverlayService : Service() {
         }
 
         if (activeViews.isEmpty()) {
+            Log.i(tag, "No active overlays; stopping service")
             stopSelf()
         }
     }
 
     override fun onDestroy() {
         super.onDestroy()
+        Log.i(tag, "Service onDestroy; removing overlays and cancelling scope")
         activeViews.keys.toList().forEach { id ->
             removeOverlay(id)
         }

@@ -16,14 +16,17 @@ class MessageRepository(private val messageDao: MessageDao) {
         packageName: String,
         sender: String,
         content: String,
-        contextTag: String? = null
+        contextTag: String? = null,
+        threadKey: String? = null
     ): Long {
         val message = Message(
             packageName = packageName,
             senderName = sender,
             originalContent = content,
             status = "RECEIVED",
-            contextTag = contextTag
+            contextTag = contextTag,
+            threadKey = threadKey,
+            userInteracted = false
         )
         return messageDao.insert(message)
     }
@@ -66,7 +69,8 @@ class MessageRepository(private val messageDao: MessageDao) {
         val message = messageDao.getMessageById(id)
         if (message != null) {
             val updated = message.copy(
-                status = "SENT"
+                status = "SENT",
+                snoozedUntil = 0L
             )
             messageDao.update(updated)
         }
@@ -76,7 +80,8 @@ class MessageRepository(private val messageDao: MessageDao) {
         val message = messageDao.getMessageById(id)
         if (message != null) {
             val updated = message.copy(
-                status = "DISMISSED"
+                status = "DISMISSED",
+                snoozedUntil = 0L
             )
             messageDao.update(updated)
         }
@@ -87,7 +92,10 @@ class MessageRepository(private val messageDao: MessageDao) {
         status: String,
         veiledContent: String? = null,
         generatedResponses: List<String> = emptyList(),
-        bucket: String? = null
+        bucket: String? = null,
+        snoozedUntil: Long? = null,
+        retryCount: Int? = null,
+        userInteracted: Boolean? = null
     ) {
         val message = messageDao.getMessageById(id)
         if (message != null) {
@@ -95,9 +103,39 @@ class MessageRepository(private val messageDao: MessageDao) {
                 status = status,
                 veiledContent = veiledContent ?: message.veiledContent,
                 generatedResponses = generatedResponses.ifEmpty { message.generatedResponses },
-                bucket = bucket ?: message.bucket
+                bucket = bucket ?: message.bucket,
+                snoozedUntil = snoozedUntil ?: message.snoozedUntil,
+                retryCount = retryCount ?: message.retryCount,
+                userInteracted = userInteracted ?: message.userInteracted
             )
             messageDao.update(updated)
         }
+    }
+
+    suspend fun getMessage(id: Long): Message? {
+        return messageDao.getMessageById(id)
+    }
+
+    suspend fun snoozeMessage(id: Long, until: Long) {
+        updateMessageState(
+            id = id,
+            status = "SNOOZED",
+            snoozedUntil = until
+        )
+    }
+
+    suspend fun markRetry(id: Long, nextAttemptAt: Long) {
+        val message = messageDao.getMessageById(id) ?: return
+        updateMessageState(
+            id = id,
+            status = "RETRY",
+            snoozedUntil = nextAttemptAt,
+            retryCount = message.retryCount + 1
+        )
+    }
+
+    suspend fun markUserInteracted(id: Long) {
+        val message = messageDao.getMessageById(id) ?: return
+        messageDao.update(message.copy(userInteracted = true))
     }
 }

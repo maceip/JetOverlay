@@ -33,7 +33,43 @@
                     android:host="slack"
                     android:path="/oauth" />
             </intent-filter>
+
+            <!-- Gmail OAuth Callback -->
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data
+                    android:scheme="jetoverlay"
+                    android:host="email-callback" />
+            </intent-filter>
+
+            <!-- Notion OAuth Callback -->
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data
+                    android:scheme="jetoverlay"
+                    android:host="notion-callback" />
+            </intent-filter>
+
+            <!-- GitHub OAuth Callback -->
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data
+                    android:scheme="jetoverlay"
+                    android:host="github-callback" />
+            </intent-filter>
         </activity>
+
+        <activity
+            android:name="com.yazan.jetoverlay.SentInboxActivity"
+            android:exported="false"
+            android:label="Sent Inbox"
+            android:theme="@style/Theme.Jetoverlay" />
 
         <service
             android:name="com.yazan.jetoverlay.service.AppNotificationListenerService"
@@ -94,5 +130,6 @@
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_PHONE_CALL" />
     <uses-permission android:name="android.permission.RECEIVE_SMS" />
     <uses-permission android:name="android.permission.READ_SMS" />
+    <uses-permission android:name="android.permission.VIBRATE" />
 
 </manifest>

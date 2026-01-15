@@ -65,6 +65,7 @@ object SettingsManager {
     // Notification settings
     private const val KEY_CANCEL_NOTIFICATIONS = "notification_cancel"
     private const val KEY_VEIL_ENABLED = "veil_enabled"
+    private const val KEY_AUTOMATION_ENABLED = "automation_enabled"
 
     // Bubble settings
     private const val KEY_BUBBLE_POSITION_X = "bubble_position_x"
@@ -133,6 +134,16 @@ object SettingsManager {
             .edit().putBoolean(KEY_VEIL_ENABLED, enabled).apply()
     }
 
+    fun isAutomationEnabled(context: Context): Boolean =
+        context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+            .getBoolean(KEY_AUTOMATION_ENABLED, false)
+
+    fun setAutomationEnabled(context: Context, enabled: Boolean) {
+        Logger.d("SettingsManager", "Automation enabled: $enabled")
+        context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+            .edit().putBoolean(KEY_AUTOMATION_ENABLED, enabled).apply()
+    }
+
     // Bubble position
     fun isRememberPositionEnabled(context: Context): Boolean =
         context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
@@ -195,6 +206,7 @@ fun SettingsScreen(
     // Notification states
     var cancelNotifications by remember { mutableStateOf(SettingsManager.isCancelNotificationsEnabled(context)) }
     var veilEnabled by remember { mutableStateOf(SettingsManager.isVeilEnabled(context)) }
+    var automationEnabled by remember { mutableStateOf(SettingsManager.isAutomationEnabled(context)) }
 
     // Bubble states
     var rememberPosition by remember { mutableStateOf(SettingsManager.isRememberPositionEnabled(context)) }
@@ -226,9 +238,14 @@ fun SettingsScreen(
         ) {
             // Permissions Section
             SettingsSection(title = "Permissions & Features") {
+                val callScreeningAvailable = permissionManager.isCallScreeningRoleAvailable()
                 SettingsClickableItem(
                     title = "Call Screening",
-                    description = if (callScreeningGranted) "Active - Protecting against spam" else "Inactive - Tap to enable",
+                    description = when {
+                        callScreeningGranted -> "Active - Protecting against spam"
+                        callScreeningAvailable -> "Inactive - Tap to enable"
+                        else -> "Not supported on this device"
+                    },
                     icon = Icons.Default.Call,
                     onClick = {
                         val intent = permissionManager.getCallScreeningRoleIntent()
@@ -240,10 +257,18 @@ fun SettingsScreen(
                     },
                     trailingContent = {
                         Text(
-                            text = if (callScreeningGranted) "ENABLED" else "DISABLED",
+                            text = when {
+                                callScreeningGranted -> "ENABLED"
+                                callScreeningAvailable -> "DISABLED"
+                                else -> "UNAVAILABLE"
+                            },
                             style = MaterialTheme.typography.labelMedium,
                             fontWeight = FontWeight.Bold,
-                            color = if (callScreeningGranted) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.error
+                            color = when {
+                                callScreeningGranted -> MaterialTheme.colorScheme.primary
+                                callScreeningAvailable -> MaterialTheme.colorScheme.error
+                                else -> MaterialTheme.colorScheme.outline
+                            }
                         )
                     }
                 )
@@ -302,6 +327,17 @@ fun SettingsScreen(
 
             // Notifications Section
             SettingsSection(title = "Notifications") {
+                SettingsToggleItem(
+                    title = "Auto Reply All",
+                    description = "Auto-send replies within 5 seconds when possible",
+                    icon = Icons.Default.Settings,
+                    checked = automationEnabled,
+                    onCheckedChange = {
+                        automationEnabled = it
+                        SettingsManager.setAutomationEnabled(context, it)
+                    }
+                )
+                HorizontalDivider()
                 SettingsToggleItem(
                     title = "Enable Veiling",
                     description = "Hide message content behind The Veil until you're ready",

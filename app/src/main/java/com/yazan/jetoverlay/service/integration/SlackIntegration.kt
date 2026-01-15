@@ -4,6 +4,8 @@ import android.content.Context
 import android.net.Uri
 import android.util.Log
 import androidx.browser.customtabs.CustomTabsIntent
+import com.yazan.jetoverlay.app.BuildConfig
+import android.widget.Toast
 import com.yazan.jetoverlay.data.MessageRepository
 import com.yazan.jetoverlay.data.SlackConfig
 import kotlinx.coroutines.CoroutineScope
@@ -19,10 +21,10 @@ import java.util.concurrent.TimeUnit
 
 object SlackIntegration {
 
-    // TODO: move secret to secure storage/remote config before release
-    private const val CLIENT_ID = "8516887257863.10240039617412"
-    private const val CLIENT_SECRET = "97709708281e3aa889287a06c3da203f"
-    // Slack app should redirect to this page, which forwards to jetoverlay://slack/oauth
+    // Provided via BuildConfig to avoid hardcoding secrets
+    private val CLIENT_ID = BuildConfig.SLACK_CLIENT_ID
+    private val CLIENT_SECRET = BuildConfig.SLACK_CLIENT_SECRET
+    // Slack app should redirect to hosted helper page which forwards to jetoverlay://slack/oauth
     private const val REDIRECT_URI = "https://maceip.github.io/id/slack-oauth.html"
     private const val TAG = "SlackIntegration"
     const val SLACK_PACKAGE_NAME = "com.slack"
@@ -40,6 +42,15 @@ object SlackIntegration {
     private var consecutiveFailures = 0
 
     fun startOAuth(context: Context) {
+        if (CLIENT_ID.isBlank() || CLIENT_SECRET.isBlank()) {
+            Log.e(TAG, "Slack OAuth not configured: set SLACK_CLIENT_ID/SECRET in gradle properties or env.")
+            Toast.makeText(
+                context,
+                "Slack OAuth not configured. Set SLACK_CLIENT_ID/SECRET.",
+                Toast.LENGTH_LONG
+            ).show()
+            return
+        }
         Log.d(TAG, "Starting Slack OAuth flow")
         val encodedRedirect = Uri.encode(REDIRECT_URI)
         val scopes = listOf(

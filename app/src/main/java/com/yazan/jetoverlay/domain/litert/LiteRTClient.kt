@@ -31,6 +31,7 @@ class LiteRTClient(
     
     // Map to track multiple stateful conversations (one per message/session)
     private val conversations = ConcurrentHashMap<String, Conversation>()
+  private val conversationLastUsed = ConcurrentHashMap<String, Long>()
     private val mutex = Mutex()
 
     /**
@@ -71,6 +72,7 @@ class LiteRTClient(
             )
             activeEngine.createConversation(config)
         }
+        conversationLastUsed[conversationId] = System.currentTimeMillis()
 
         Logger.d(COMPONENT, "Sending message to conversation [$conversationId]: $text")
         
@@ -83,12 +85,24 @@ class LiteRTClient(
      */
     suspend fun closeConversation(conversationId: String) = mutex.withLock {
         conversations.remove(conversationId)?.close()
+    conversationLastUsed.remove(conversationId)
         Logger.i(COMPONENT, "Conversation [$conversationId] closed and removed")
     }
+
+  suspend fun pruneIdleConversations(maxIdleMs: Long) = mutex.withLock {
+    val now = System.currentTimeMillis()
+    val idleIds = conversationLastUsed.filterValues { now - it > maxIdleMs }.keys
+    idleIds.forEach { id ->
+      conversations.remove(id)?.close()
+      conversationLastUsed.remove(id)
+      Logger.i(COMPONENT, "Pruned idle conversation [$id]")
+    }
+  }
 
     override fun close() {
         conversations.values.forEach { it.close() }
         conversations.clear()
+    conversationLastUsed.clear()
         engine?.close()
         engine = null
         Logger.i(COMPONENT, "LiteRT Client closed")

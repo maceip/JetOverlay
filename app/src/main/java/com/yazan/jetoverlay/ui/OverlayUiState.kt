@@ -3,6 +3,7 @@ package com.yazan.jetoverlay.ui
 import android.util.Log
 import androidx.compose.runtime.Stable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import com.yazan.jetoverlay.data.Message
@@ -61,8 +62,22 @@ class OverlayUiState(
     // Editing mode state
     var isEditing by mutableStateOf(false)
 
+    // Countdown for auto-send (seconds remaining)
+    var countdownSeconds by mutableIntStateOf(0)
+        private set
+
     // Custom edited response text (when editing)
     var editedResponse by mutableStateOf("")
+
+    // Regeneration state
+    var isRegenerating by mutableStateOf(false)
+        private set
+
+    // Safe mode state (degraded overlay)
+    var isSafeMode by mutableStateOf(false)
+        private set
+    var safeModeMessage by mutableStateOf<String?>(null)
+        private set
 
     // Callbacks for actions (set by the overlay controller)
     var onRegenerateResponses: (() -> Unit)? = null
@@ -121,6 +136,7 @@ class OverlayUiState(
 
     fun markInteracted() {
         userInteracted = true
+        countdownSeconds = 0
     }
 
     fun resetInteraction() {
@@ -135,6 +151,16 @@ class OverlayUiState(
         pendingCounts = counts
         // Update total pending count
         pendingMessageCount = counts.values.sum()
+    }
+
+    fun setSafeMode(message: String?) {
+        isSafeMode = true
+        safeModeMessage = message
+    }
+
+    fun clearSafeMode() {
+        isSafeMode = false
+        safeModeMessage = null
     }
 
     // Get buckets that have pending messages, sorted by priority
@@ -226,10 +252,27 @@ class OverlayUiState(
 
     fun regenerateResponses() {
         try {
+            isRegenerating = true
             onRegenerateResponses?.invoke()
         } catch (e: Exception) {
             Log.e(TAG, "Error in regenerateResponses", e)
         }
+    }
+
+    fun startRegenerating() {
+        isRegenerating = true
+    }
+
+    fun finishRegenerating() {
+        isRegenerating = false
+    }
+
+    fun setCountdown(seconds: Int) {
+        countdownSeconds = seconds.coerceAtLeast(0)
+    }
+
+    fun clearCountdown() {
+        countdownSeconds = 0
     }
 
     fun sendSelectedResponse() {

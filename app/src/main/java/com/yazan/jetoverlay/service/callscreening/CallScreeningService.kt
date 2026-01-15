@@ -73,6 +73,9 @@ class CallScreeningService : Service() {
 
     private lateinit var audioCapture: AudioCaptureStub
     private lateinit var speechToText: SpeechToTextStub
+    private lateinit var ttsPromptPlayer: TtsPromptPlayer
+    private val promptGenerator = CallScreeningPromptGenerator()
+    private var lastPartialTranscript: String? = null
 
     // Current screening state
     private val _screeningState = MutableStateFlow<ScreeningState>(ScreeningState.Idle)
@@ -137,6 +140,7 @@ class CallScreeningService : Service() {
         instance = this
         audioCapture = AudioCaptureStub(this)
         speechToText = SpeechToTextStub(this)
+        ttsPromptPlayer = TtsPromptPlayer(this)
 
         startForegroundNotification()
         setupAudioPipeline()
@@ -177,9 +181,11 @@ class CallScreeningService : Service() {
                 val currentState = _screeningState.value
                 if (currentState is ScreeningState.Screening) {
                     val updatedTranscript = if (result.isFinal) {
+                        lastPartialTranscript = null
                         "${currentState.transcript} ${result.text}".trim()
                     } else {
-                        currentState.transcript
+                        lastPartialTranscript = result.text
+                        "${currentState.transcript} ${result.text}".trim()
                     }
 
                     _screeningState.value = ScreeningState.Screening(
@@ -218,6 +224,16 @@ class CallScreeningService : Service() {
         _currentCall.value = callInfo
         _screeningState.value = ScreeningState.IncomingCall(callInfo)
         _screeningEvents.emit(ScreeningEvent.CallReceived(callInfo))
+    }
+
+    /**
+     * Plays the greeting prompt and then starts listening for caller response.
+     */
+    suspend fun startGreetingAndListen(assistantName: String = "Agent") {
+        val prompt = promptGenerator.buildPrompt(assistantName)
+        Logger.d(COMPONENT, "Playing greeting prompt: $prompt")
+        ttsPromptPlayer.speak(prompt)
+        startScreening()
     }
 
     /**

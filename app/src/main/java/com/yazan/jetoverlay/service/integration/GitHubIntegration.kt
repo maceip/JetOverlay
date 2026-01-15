@@ -5,6 +5,8 @@ import android.content.Intent
 import android.net.Uri
 import android.util.Log
 import androidx.browser.customtabs.CustomTabsIntent
+import android.widget.Toast
+import com.yazan.jetoverlay.app.BuildConfig
 import com.yazan.jetoverlay.JetOverlayApplication
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -21,9 +23,9 @@ import kotlinx.coroutines.withContext
 object GitHubIntegration {
 
     private const val TAG = "GitHubIntegration"
-    private const val CLIENT_ID = "YOUR_GITHUB_CLIENT_ID" // TODO: Replace with actual credentials
-    private const val CLIENT_SECRET = "YOUR_GITHUB_CLIENT_SECRET" // TODO: Replace
-    private const val REDIRECT_URI = "jetoverlay://github-callback"
+    private val CLIENT_ID = BuildConfig.GITHUB_CLIENT_ID
+    private val CLIENT_SECRET = BuildConfig.GITHUB_CLIENT_SECRET
+    private val REDIRECT_URI = BuildConfig.GITHUB_REDIRECT_URI.ifBlank { "jetoverlay://github-callback" }
     const val GITHUB_PACKAGE_NAME = "github"
 
     // OAuth URL for GitHub
@@ -41,6 +43,15 @@ object GitHubIntegration {
      * Opens a browser/custom tab with GitHub's authorization page.
      */
     fun startOAuth(context: Context) {
+        if (CLIENT_ID.isBlank() || CLIENT_SECRET.isBlank()) {
+            Log.e(TAG, "GitHub OAuth not configured: set GITHUB_CLIENT_ID/SECRET in gradle properties or env.")
+            Toast.makeText(
+                context,
+                "GitHub OAuth not configured. Set GITHUB_CLIENT_ID/SECRET.",
+                Toast.LENGTH_LONG
+            ).show()
+            return
+        }
         Log.d(TAG, "GitHub integration not yet implemented - OAuth flow is stubbed")
 
         val authUrl = "$GITHUB_AUTH_URL" +
@@ -162,7 +173,8 @@ object GitHubIntegration {
                     repository.ingestNotification(
                         packageName = GITHUB_PACKAGE_NAME,
                         sender = notification.author,
-                        content = content
+                        content = content,
+                        threadKey = "$GITHUB_PACKAGE_NAME:${notification.author.lowercase()}"
                     )
                     Log.d(TAG, "Ingested mock GitHub notification from ${notification.author}")
                 }

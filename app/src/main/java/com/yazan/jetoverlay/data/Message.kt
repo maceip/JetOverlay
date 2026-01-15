@@ -16,6 +16,7 @@ data class Message(
     val senderName: String,
     val originalContent: String,
     val veiledContent: String? = null,
+    @ColumnInfo(defaultValue = "[]")
     val generatedResponses: List<String> = emptyList(),
     val selectedResponse: String? = null,
     @ColumnInfo(defaultValue = "RECEIVED")
@@ -23,7 +24,11 @@ data class Message(
     @ColumnInfo(defaultValue = "UNKNOWN")
     val bucket: String = "UNKNOWN",
     val timestamp: Long = System.currentTimeMillis(),
-    val contextTag: String? = null  // personal, work, social, email, other
+    val contextTag: String? = null,  // personal, work, social, email, other
+    val threadKey: String? = null,
+    val snoozedUntil: Long = 0L,
+    val retryCount: Int = 0,
+    val userInteracted: Boolean = false
 )
 
 class Converters {

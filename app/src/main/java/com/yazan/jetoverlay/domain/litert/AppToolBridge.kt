@@ -40,10 +40,10 @@ class AppToolBridge : ToolRegistry {
     
     @Tool(description = "Marks a specific message as read.")
     fun mark_as_read(
-        @ToolParam(description = "The ID of the message to mark as read") messageId: Long
+        @ToolParam(description = "The ID of the message to mark as read") messageId: String
     ): String {
-         Logger.i(COMPONENT, "Tool called: mark_as_read($messageId)")
-         // In a real app, this would call the repository
-         return "Message $messageId marked as read."
+        Logger.i(COMPONENT, "Tool called: mark_as_read($messageId)")
+        // In a real app, this would call the repository
+        return "Message $messageId marked as read."
     }
 }

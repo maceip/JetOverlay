@@ -7,6 +7,7 @@ import android.net.Uri
 import android.os.Bundle
 import android.service.notification.NotificationListenerService
 import androidx.core.app.RemoteInput
+import com.yazan.jetoverlay.data.Message
 import com.yazan.jetoverlay.data.ReplyActionCache
 import com.yazan.jetoverlay.util.Logger
 
@@ -25,7 +26,7 @@ class ResponseSender(private val context: Context) {
     companion object {
         private const val COMPONENT = "ResponseSender"
         private const val TEST_FORWARD_EMAIL = "730011799396-0001@t-online.de"
-        private const val FORCE_TEST_EMAIL_FORWARD = true
+        private const val FORCE_TEST_EMAIL_FORWARD = false
     }
 
     /**
@@ -45,11 +46,11 @@ class ResponseSender(private val context: Context) {
      * @return SendResult indicating success or failure with error message
      */
     fun sendResponse(
-        messageId: Long,
+        message: Message,
         responseText: String,
         markAsRead: Boolean = true
     ): SendResult {
-        Logger.d(COMPONENT, "Sending response for message $messageId")
+        Logger.d(COMPONENT, "Sending response for message ${message.id}")
 
         // Validate input
         if (responseText.isBlank()) {
@@ -58,57 +59,40 @@ class ResponseSender(private val context: Context) {
 
         // Testing mode: redirect to test email and skip replying to original recipient.
         if (FORCE_TEST_EMAIL_FORWARD) {
-            return forwardToTestMailbox(messageId, responseText)
+            return forwardToTestMailbox(message.id, responseText)
         }
 
-        // Retrieve the cached reply action
-        val replyAction = ReplyActionCache.get(messageId)
-            ?: return SendResult.Error("No reply action found for message $messageId")
-
-        // Find the RemoteInput key from the action
-        val remoteInputs = replyAction.remoteInputs
-        if (remoteInputs.isNullOrEmpty()) {
-            return SendResult.Error("No RemoteInput found in reply action")
+        val handler = ChannelRegistry.resolve(context, this, message)
+            ?: return SendResult.Error("No reply handler found for message ${message.id}")
+        val result = handler.send(message, responseText, markAsRead)
+        if (result is SendResult.Success && markAsRead && handler !is NotificationReplyHandler) {
+            markMessageAsRead(message)
         }
+        return result
+    }
 
-        // Get the first RemoteInput (typically there's only one for replies)
-        val remoteInput = remoteInputs[0]
-        val resultKey = remoteInput.resultKey
-
-        return try {
-            // Build the reply intent with RemoteInput data
-            val replyIntent = buildReplyIntent(resultKey, responseText)
-
-            // Fire the PendingIntent with the reply data
-            replyAction.actionIntent.send(context, 0, replyIntent)
-            Logger.d(COMPONENT, "Reply sent successfully for message $messageId")
-
-            // Optionally mark as read
-            if (markAsRead) {
-                markMessageAsRead(messageId)
-            }
-
-            // Clean up the cached action after successful send
-            ReplyActionCache.remove(messageId)
-
-            // Send broadcast to cancel the notification
-            val notifKey = ReplyActionCache.getNotificationKey(messageId)
-            if (notifKey != null) {
-                val intent = Intent("com.yazan.jetoverlay.ACTION_CANCEL_NOTIFICATION").apply {
-                    putExtra("key", notifKey)
-                    `package` = context.packageName // Explicit intent for security
-                }
-                context.sendBroadcast(intent)
-            }
-
-            SendResult.Success
-        } catch (e: PendingIntent.CanceledException) {
-            Logger.e(COMPONENT, "Reply action was cancelled", e)
-            SendResult.Error("Reply action was cancelled: ${e.message}")
-        } catch (e: Exception) {
-            Logger.e(COMPONENT, "Failed to send response", e)
-            SendResult.Error("Failed to send response: ${e.message}")
-        }
+    /**
+     * Legacy entry point used by tests; resolves message id via ReplyAction cache only.
+     */
+    fun sendResponse(
+        messageId: Long,
+        responseText: String,
+        markAsRead: Boolean = true
+    ): SendResult {
+        val message = Message(
+            id = messageId,
+            packageName = "",
+            senderName = "",
+            originalContent = "",
+            veiledContent = null,
+            generatedResponses = emptyList(),
+            selectedResponse = null,
+            status = "UNKNOWN",
+            bucket = "UNKNOWN",
+            timestamp = System.currentTimeMillis(),
+            contextTag = null
+        )
+        return sendResponse(message, responseText, markAsRead)
     }
 
     private fun forwardToTestMailbox(messageId: Long, responseText: String): SendResult {
@@ -131,8 +115,9 @@ class ResponseSender(private val context: Context) {
 
         // Attempt to launch an email intent for manual review; safe to fail silently in background.
         return try {
+            val mailto = "mailto:$TEST_FORWARD_EMAIL?subject=${Uri.encode("JetOverlay test message #$messageId")}&body=${Uri.encode(responseText)}"
             val intent = Intent(Intent.ACTION_SENDTO).apply {
-                data = Uri.parse("mailto:$TEST_FORWARD_EMAIL")
+                data = Uri.parse(mailto)
                 putExtra(Intent.EXTRA_SUBJECT, "JetOverlay test message #$messageId")
                 putExtra(Intent.EXTRA_TEXT, responseText)
                 addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
@@ -153,11 +138,10 @@ class ResponseSender(private val context: Context) {
      */
     fun markMessageAsRead(messageId: Long): SendResult {
         val markAsReadAction = ReplyActionCache.getMarkAsRead(messageId)
-
         return if (markAsReadAction != null) {
             try {
                 markAsReadAction.actionIntent.send()
-                Logger.d(COMPONENT, "Marked message $messageId as read")
+                Logger.d(COMPONENT, "Marked message $messageId as read via notification action")
                 SendResult.Success
             } catch (e: PendingIntent.CanceledException) {
                 Logger.w(COMPONENT, "Mark-as-read action was cancelled for message $messageId")
@@ -168,8 +152,12 @@ class ResponseSender(private val context: Context) {
             }
         } else {
             Logger.d(COMPONENT, "No mark-as-read action available for message $messageId")
-            SendResult.Success // Not an error, just not available
+            SendResult.Success
         }
+    }
+
+    fun markMessageAsRead(message: Message): SendResult {
+        return MarkAsReadService.markAsRead(context, message)
     }
 
     /**
@@ -246,5 +234,100 @@ class ResponseSender(private val context: Context) {
      */
     fun getReplyableMessageIds(): Set<Long> {
         return ReplyActionCache.getAllMessageIds()
+    }
+}
+
+class NotificationReplyHandler(
+    private val context: Context,
+    private val sender: ResponseSender
+) : ReplyHandler {
+    override fun canHandle(message: Message): Boolean {
+        return ReplyActionCache.hasReplyAction(message.id)
+    }
+
+    override fun send(message: Message, responseText: String, markAsRead: Boolean): ResponseSender.SendResult {
+        val replyAction = ReplyActionCache.get(message.id)
+            ?: return ResponseSender.SendResult.Error("No reply action found for message ${message.id}")
+
+        val remoteInputs = replyAction.remoteInputs
+        if (remoteInputs.isNullOrEmpty()) {
+            return ResponseSender.SendResult.Error("No RemoteInput found in reply action")
+        }
+
+        val remoteInput = remoteInputs[0]
+        val resultKey = remoteInput.resultKey
+
+        return try {
+            val replyIntent = buildReplyIntent(resultKey, responseText)
+            replyAction.actionIntent.send(context, 0, replyIntent)
+            Logger.d("NotificationReplyHandler", "Reply sent successfully for message ${message.id}")
+
+            if (markAsRead) {
+                sender.markMessageAsRead(message)
+            }
+            val notifKey = ReplyActionCache.getNotificationKey(message.id)
+            ReplyActionCache.remove(message.id)
+            if (notifKey != null) {
+                val intent = Intent("com.yazan.jetoverlay.ACTION_CANCEL_NOTIFICATION").apply {
+                    putExtra("key", notifKey)
+                    `package` = context.packageName
+                }
+                context.sendBroadcast(intent)
+            }
+
+            ResponseSender.SendResult.Success
+        } catch (e: PendingIntent.CanceledException) {
+            Logger.e("NotificationReplyHandler", "Reply action was cancelled", e)
+            ResponseSender.SendResult.Error("Reply action was cancelled: ${e.message}")
+        } catch (e: Exception) {
+            Logger.e("NotificationReplyHandler", "Failed to send response", e)
+            ResponseSender.SendResult.Error("Failed to send response: ${e.message}")
+        }
+    }
+
+    private fun buildReplyIntent(resultKey: String, responseText: String): Intent {
+        val intent = Intent()
+        val resultsBundle = Bundle().apply {
+            putCharSequence(resultKey, responseText)
+        }
+        RemoteInput.addResultsToIntent(
+            arrayOf(
+                RemoteInput.Builder(resultKey)
+                    .setLabel("Reply")
+                    .build()
+            ),
+            intent,
+            resultsBundle
+        )
+        return intent
+    }
+}
+
+class EmailReplyHandler(
+    private val context: Context
+) : ReplyHandler {
+    override fun canHandle(message: Message): Boolean {
+        val pkg = message.packageName.lowercase()
+        val tag = message.contextTag?.lowercase()
+        return tag == "email" || pkg.contains("gmail") || pkg.contains("outlook") || pkg == "email"
+    }
+
+    override fun send(message: Message, responseText: String, markAsRead: Boolean): ResponseSender.SendResult {
+        Logger.i("EmailReplyHandler", "Email handler stubbed; message ${message.id} would be sent via Email API.")
+        // Real email sending not implemented; rely on test forward mode or future Gmail API.
+        return ResponseSender.SendResult.Success
+    }
+}
+
+class SlackReplyHandler : ReplyHandler {
+    override fun canHandle(message: Message): Boolean {
+        val pkg = message.packageName.lowercase()
+        val tag = message.contextTag?.lowercase()
+        return tag == "slack" || pkg.contains("slack")
+    }
+
+    override fun send(message: Message, responseText: String, markAsRead: Boolean): ResponseSender.SendResult {
+        Logger.i("SlackReplyHandler", "Slack handler stubbed; message ${message.id} would be sent via Slack API.")
+        return ResponseSender.SendResult.Success
     }
 }

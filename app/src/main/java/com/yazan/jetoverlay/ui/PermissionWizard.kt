@@ -44,6 +44,7 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
@@ -69,6 +70,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.LifecycleResumeEffect
 import com.yazan.jetoverlay.util.Logger
+import android.widget.Toast
 
 /**
  * Step-by-step permission wizard for onboarding users.
@@ -79,12 +81,15 @@ fun PermissionWizard(
     permissionManager: PermissionManager,
     onAllPermissionsGranted: () -> Unit,
     onSkipOptional: () -> Unit,
+    startAtOptional: Boolean = false,
     modifier: Modifier = Modifier
 ) {
     val context = LocalContext.current
 
     // Track current step (0-based index into permission list)
-    var currentStepIndex by remember { mutableIntStateOf(0) }
+    var currentStepIndex by remember {
+        mutableIntStateOf(0)
+    }
 
     // Get all permissions to request (required first)
     val allPermissions = remember { RequiredPermission.allRequired() + RequiredPermission.allOptional() }
@@ -92,9 +97,18 @@ fun PermissionWizard(
     val optionalStartIndex = requiredCount
     val lastIndex = allPermissions.lastIndex
 
+    LaunchedEffect(startAtOptional) {
+        if (startAtOptional && optionalStartIndex <= lastIndex) {
+            currentStepIndex = optionalStartIndex
+        }
+    }
+
     // Track which optional permissions have been explicitly handled (granted or skipped)
     var handledOptionalIndices by remember { mutableStateOf(setOf<Int>()) }
     var optionalFinished by remember { mutableStateOf(false) }
+
+    // Track request in-flight to show a spinner on the action button
+    var isRequesting by remember { mutableStateOf(false) }
 
     // Track permission statuses
     var permissionStatuses by remember {
@@ -108,7 +122,7 @@ fun PermissionWizard(
     val grantedCount = permissionStatuses.count { it }
     val progress by animateFloatAsState(
         targetValue = if (requiredCount == 0) 1f else grantedCount.toFloat() / requiredCount.toFloat(),
-        animationSpec = tween(300),
+        animationSpec = tween(120),
         label = "progress"
     )
 
@@ -117,15 +131,16 @@ fun PermissionWizard(
 
     // Launcher for runtime permissions
     val runtimePermissionLauncher = rememberLauncherForActivityResult(
-        contract = ActivityResultContracts.RequestMultiplePermissions(),
+        contract = ActivityResultContracts.RequestMultiplePermissions(),        
         onResult = { results ->
             val allGranted = results.values.all { it }
             if (!allGranted) {
-                val currentPermission = allPermissions[currentStepIndex]
-                permissionManager.recordPermissionDenied(currentPermission)
+                val currentPermission = allPermissions[currentStepIndex]        
+                permissionManager.recordPermissionDenied(currentPermission)     
             }
             // Refresh status
             permissionStatuses = allPermissions.map { permissionManager.isPermissionGranted(it) }
+            isRequesting = false
         }
     )
 
@@ -134,6 +149,7 @@ fun PermissionWizard(
         contract = ActivityResultContracts.StartActivityForResult(),
         onResult = {
             // Status will be refreshed on resume
+            isRequesting = false
         }
     )
 
@@ -152,6 +168,8 @@ fun PermissionWizard(
             val nextMissingRequired = permissionStatuses.take(requiredCount).indexOfFirst { !it }
             if (nextMissingRequired != -1) {
                 currentStepIndex = nextMissingRequired
+            } else if (startAtOptional && optionalStartIndex <= lastIndex) {
+                currentStepIndex = optionalStartIndex
             } else {
                 onAllPermissionsGranted()
             }
@@ -167,6 +185,9 @@ fun PermissionWizard(
                     optionalFinished = true
                     onSkipOptional()
                 }
+            } else if (startAtOptional && permissionStatuses.drop(optionalStartIndex).all { it }) {
+                optionalFinished = true
+                onSkipOptional()
             }
         }
     }
@@ -244,6 +265,7 @@ fun PermissionWizard(
                         deniedCount = permissionManager.getDeniedCount(permission),
                         isOptional = stepIndex >= requiredCount,
                         onRequestPermission = {
+                            isRequesting = true
                             Logger.d("PermissionWizard", "Requesting permission: ${permission.title}")
                             if (permissionManager.requiresSettingsNavigation(permission)) {
                                 when (permission) {
@@ -266,7 +288,8 @@ fun PermissionWizard(
                                             }
                                         } else {
                                             Logger.d("PermissionWizard", "Call Screening intent is null, using fallback")
-                                            settingsLauncher.launch(permissionManager.getAppSettingsIntent())
+                                            isRequesting = false
+                                            Toast.makeText(context, "Call screening role not available on this device.", Toast.LENGTH_SHORT).show()
                                         }
                                     }
                                     else -> {
@@ -277,10 +300,13 @@ fun PermissionWizard(
                                 val runtimePermissions = permissionManager.getRuntimePermissions(permission)
                                 if (runtimePermissions.isNotEmpty()) {
                                     runtimePermissionLauncher.launch(runtimePermissions)
+                                } else {
+                                    isRequesting = false
                                 }
                             }
                         },
                         onOpenSettings = {
+                            isRequesting = true
                             settingsLauncher.launch(permissionManager.getAppSettingsIntent())
                         },
                         onSkip = if (stepIndex >= requiredCount) {
@@ -296,8 +322,11 @@ fun PermissionWizard(
                                     optionalFinished = true
                                     onSkipOptional()
                                 }
+                                isRequesting = false
                             }
-                        } else null
+                        } else null,
+                        showOpenSettings = permissionManager.requiresSettingsNavigation(permission),
+                        isRequesting = isRequesting
                     )
                 }
             }
@@ -512,11 +541,11 @@ fun PermissionRequestCard(
     onRequestPermission: () -> Unit,
     onOpenSettings: () -> Unit,
     onSkip: (() -> Unit)?,
+    showOpenSettings: Boolean = deniedCount >= 2,
+    isRequesting: Boolean = false,
     modifier: Modifier = Modifier
 ) {
     val showRationale = deniedCount >= 1
-    val showOpenSettings = deniedCount >= 2
-
     Card(
         modifier = modifier
             .fillMaxWidth()
@@ -651,17 +680,28 @@ fun PermissionRequestCard(
                             .testTag("grant_permission_button"),
                         colors = ButtonDefaults.buttonColors(
                             containerColor = MaterialTheme.colorScheme.primary
-                        )
+                        ),
+                        enabled = !isRequesting
                     ) {
-                        Icon(
-                            imageVector = if (showOpenSettings) Icons.Default.Settings else Icons.Rounded.Add,
-                            contentDescription = null,
-                            modifier = Modifier.size(18.dp)
-                        )
-                        Spacer(modifier = Modifier.width(8.dp))
-                        Text(
-                            text = if (showOpenSettings) "Open Settings" else "Grant Permission"
-                        )
+                        if (isRequesting) {
+                            CircularProgressIndicator(
+                                color = MaterialTheme.colorScheme.onPrimary,
+                                strokeWidth = 2.dp,
+                                modifier = Modifier.size(18.dp)
+                            )
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text("Working…")
+                        } else {
+                            Icon(
+                                imageVector = if (showOpenSettings) Icons.Default.Settings else Icons.Rounded.Add,
+                                contentDescription = null,
+                                modifier = Modifier.size(18.dp)
+                            )
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text(
+                                text = if (showOpenSettings) "Open Settings" else "Grant Permission"
+                            )
+                        }
                     }
 
                     if (onSkip != null) {

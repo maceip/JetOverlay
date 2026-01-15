@@ -5,6 +5,7 @@ import android.content.Intent
 import android.content.pm.PackageManager
 import android.os.Build
 import android.provider.Settings
+import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.AnimatedContent
@@ -58,6 +59,7 @@ import androidx.compose.ui.draw.scale
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
@@ -67,8 +69,11 @@ import androidx.core.content.ContextCompat
 import androidx.core.net.toUri
 import androidx.lifecycle.compose.LifecycleResumeEffect
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import coil.compose.AsyncImage
 import com.yazan.jetoverlay.api.OverlayConfig
 import com.yazan.jetoverlay.api.OverlaySdk
+import com.yazan.jetoverlay.data.MessageRepository
+import com.yazan.jetoverlay.domain.MessageProcessor
 import com.yazan.jetoverlay.ui.OnboardingManager
 import com.yazan.jetoverlay.ui.OnboardingScreen
 import com.yazan.jetoverlay.ui.PermissionWizard
@@ -92,6 +97,7 @@ fun OverlayControlPanel(modifier: Modifier = Modifier) {
 
     // Initialize PermissionManager
     val permissionManager = remember { PermissionManager(context) }
+    val repository = remember { JetOverlayApplication.instance.repository }
 
     // Observe Active Overlays from SDK
     val activeOverlays by OverlaySdk.activeOverlays.collectAsStateWithLifecycle()
@@ -107,6 +113,7 @@ fun OverlayControlPanel(modifier: Modifier = Modifier) {
 
     // Track if user has completed the wizard (either granted all or skipped optional)
     var wizardCompleted by remember { mutableStateOf(allRequiredPermissionsGranted) }
+    var launchOptionalWizard by remember { mutableStateOf(false) }
 
     // Determine current state
     val currentState = remember(onboardingComplete.value, allRequiredPermissionsGranted, wizardCompleted) {
@@ -130,6 +137,12 @@ fun OverlayControlPanel(modifier: Modifier = Modifier) {
     val lifecycleOwner = androidx.lifecycle.compose.LocalLifecycleOwner.current
     LaunchedEffect(currentState) {
         if (currentState == ControlPanelState.MAIN_PANEL) {
+            // Ensure content is registered (defensive: some devices clear registry on process swap)
+            if (!OverlaySdk.isContentRegistered("overlay_1")) {
+                OverlaySdk.registerContent("overlay_1") {
+                    com.yazan.jetoverlay.ui.AgentOverlay(repository = repository)
+                }
+            }
             // Start the DataAcquisitionService when the UI is visible.
             // This is safe because the app is in the foreground.
             if (lifecycleOwner.lifecycle.currentState.isAtLeast(androidx.lifecycle.Lifecycle.State.STARTED)) {
@@ -139,8 +152,14 @@ fun OverlayControlPanel(modifier: Modifier = Modifier) {
                     Logger.e("OverlayControlPanel", "Failed to start DataAcquisitionService", e)
                 }
             }
-            
-            if (!OverlaySdk.isOverlayActive("agent_bubble")) {
+
+            if (!permissionManager.hasOverlayPermission()) {
+                Toast.makeText(context, "Overlay permission required. Opening settings…", Toast.LENGTH_SHORT).show()
+                val intent = permissionManager.getOverlayPermissionIntent().apply {
+                    flags = Intent.FLAG_ACTIVITY_NEW_TASK
+                }
+                context.startActivity(intent)
+            } else if (!OverlaySdk.isOverlayActive("agent_bubble")) {
                 Logger.uiState("OverlayControlPanel", "Auto-showing agent bubble")
                 OverlaySdk.show(
                     context = context,
@@ -182,16 +201,24 @@ fun OverlayControlPanel(modifier: Modifier = Modifier) {
                     onAllPermissionsGranted = {
                         allRequiredPermissionsGranted = true
                         wizardCompleted = true
+                        launchOptionalWizard = false
                     },
                     onSkipOptional = {
                         wizardCompleted = true
+                        launchOptionalWizard = false
                     },
+                    startAtOptional = launchOptionalWizard,
                     modifier = Modifier.fillMaxSize()
                 )
             }
             ControlPanelState.MAIN_PANEL -> {
                 MainControlPanel(
                     permissionManager = permissionManager,
+                    onRequestOptionalPermissions = {
+                        // Force state back into permission wizard to handle optional set
+                        wizardCompleted = false
+                        launchOptionalWizard = true
+                    },
                     modifier = Modifier.fillMaxSize()
                 )
             }
@@ -205,6 +232,7 @@ fun OverlayControlPanel(modifier: Modifier = Modifier) {
 @Composable
 private fun MainControlPanel(
     permissionManager: PermissionManager,
+    onRequestOptionalPermissions: () -> Unit,
     modifier: Modifier = Modifier
 ) {
     val context = LocalContext.current
@@ -275,7 +303,9 @@ private fun MainControlPanel(
                 modifier = Modifier
                     .fillMaxWidth()
                     .clickable {
-                        // Could navigate to permissions screen
+                        Logger.d("ControlPanel", "Optional permissions card tapped; launching wizard")
+                        onRequestOptionalPermissions()
+                        Toast.makeText(context, "Opening optional permissions…", Toast.LENGTH_SHORT).show()
                     }
                     .testTag("optional_permissions_card"),
                 shape = RoundedCornerShape(12.dp)
@@ -328,6 +358,8 @@ private fun MainControlPanel(
                     },
                     modifier = Modifier.fillMaxWidth()
                 ) {
+                    IntegrationIcon("file:///android_asset/icons/slack.svg", "Slack")
+                    Spacer(modifier = Modifier.width(8.dp))
                     Text("Connect Slack")
                 }
                 Spacer(modifier = Modifier.height(8.dp))
@@ -337,11 +369,7 @@ private fun MainControlPanel(
                     },
                     modifier = Modifier.fillMaxWidth()
                 ) {
-                    Icon(
-                        imageVector = Icons.Default.Email,
-                        contentDescription = null,
-                        modifier = Modifier.size(18.dp)
-                    )
+                    IntegrationIcon("file:///android_asset/icons/gmail.svg", "Email")
                     Spacer(modifier = Modifier.width(8.dp))
                     Text("Connect Email")
                 }
@@ -352,6 +380,8 @@ private fun MainControlPanel(
                     },
                     modifier = Modifier.fillMaxWidth()
                 ) {
+                    IntegrationIcon("file:///android_asset/icons/notion.svg", "Notion")
+                    Spacer(modifier = Modifier.width(8.dp))
                     Text("Connect Notion")
                 }
                 Spacer(modifier = Modifier.height(8.dp))
@@ -361,6 +391,8 @@ private fun MainControlPanel(
                     },
                     modifier = Modifier.fillMaxWidth()
                 ) {
+                    IntegrationIcon("file:///android_asset/icons/github.svg", "GitHub")
+                    Spacer(modifier = Modifier.width(8.dp))
                     Text("Connect GitHub")
                 }
             }
@@ -368,25 +400,111 @@ private fun MainControlPanel(
 
         Spacer(modifier = Modifier.height(24.dp))
 
-        // Debug Button
-        androidx.compose.material3.Button(
-            onClick = {
-                // Manually trigger the agent bubble for testing
-                if (!OverlaySdk.isOverlayActive("agent_bubble")) {
-                    OverlaySdk.show(
-                        context = context,
-                        config = OverlayConfig(
-                            id = "agent_bubble",
-                            type = "overlay_1",
-                            initialX = 0,
-                            initialY = 120
+        // Overlay status / CTA
+        Card(
+            modifier = Modifier
+                .fillMaxWidth(),
+            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
+            shape = RoundedCornerShape(16.dp)
+        ) {
+            Column(
+                modifier = Modifier.padding(16.dp),
+                verticalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                Text(
+                    text = "Agent is ready",
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.Bold
+                )
+                Text(
+                    text = if (OverlaySdk.isOverlayActive("agent_bubble")) {
+                        "The overlay is running in the background. Double-tap the bar at the bottom to open it when it glows."
+                    } else {
+                        "The overlay isn’t visible yet. Tap below to start it, or grant overlay permission if prompted."
+                    },
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                androidx.compose.material3.Button(
+                    onClick = {
+                        if (!permissionManager.hasOverlayPermission()) {        
+                            Logger.d("ControlPanel", "Start overlay blocked: missing overlay permission")
+                            Toast.makeText(context, "Overlay permission required. Opening settings…", Toast.LENGTH_SHORT).show()
+                            val intent = permissionManager.getOverlayPermissionIntent().apply {
+                                flags = Intent.FLAG_ACTIVITY_NEW_TASK
+                            }
+                            context.startActivity(intent)
+                            return@Button
+                        }
+                        Logger.d("ControlPanel", "Start overlay requested (id=agent_bubble, type=overlay_1)")
+                        Toast.makeText(context, "Starting overlay… look for the bar at the bottom.", Toast.LENGTH_SHORT).show()
+                        com.yazan.jetoverlay.util.OverlayLaunchCoordinator.requestOverlay(
+                            context = context,
+                            config = OverlayConfig(
+                                id = "agent_bubble",
+                                type = "overlay_1",
+                                initialX = 0,
+                                initialY = 120
+                            ),
+                            source = "control_panel"
                         )
+                    },
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Text(if (OverlaySdk.isOverlayActive("agent_bubble")) "Overlay Running" else "Start Overlay")
+                }
+            }
+        }
+
+        Spacer(modifier = Modifier.height(16.dp))
+
+        Card(
+            modifier = Modifier.fillMaxWidth(),
+            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+            shape = RoundedCornerShape(16.dp)
+        ) {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(16.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Box(
+                    modifier = Modifier
+                        .size(44.dp)
+                        .clip(CircleShape)
+                        .background(MaterialTheme.colorScheme.primaryContainer),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Email,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.onPrimaryContainer
                     )
                 }
-            },
-            modifier = Modifier.fillMaxWidth()
-        ) {
-            Text("Test: Spawn Agent Bubble")
+                Spacer(modifier = Modifier.width(12.dp))
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        text = "Sent Inbox",
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.Bold
+                    )
+                    Text(
+                        text = "Browse every message the agent has sent.",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+                androidx.compose.material3.Button(
+                    onClick = {
+                        context.startActivity(
+                            Intent(context, SentInboxActivity::class.java)
+                        )
+                    }
+                ) {
+                    Text("Open")
+                }
+            }
         }
 
         Spacer(modifier = Modifier.height(16.dp))
@@ -429,6 +547,28 @@ fun PermissionWarningCard(
             }
         }
     }
+}
+
+@Composable
+private fun IntegrationIcon(
+    model: String,
+    contentDescription: String
+) {
+    val context = LocalContext.current
+    val imageLoader = remember {
+        coil.ImageLoader.Builder(context)
+            .components {
+                add(coil.decode.SvgDecoder.Factory())
+            }
+            .build()
+    }
+    AsyncImage(
+        model = model,
+        contentDescription = contentDescription,
+        imageLoader = imageLoader,
+        modifier = Modifier.size(20.dp),
+        contentScale = ContentScale.Fit
+    )
 }
 
 @Composable

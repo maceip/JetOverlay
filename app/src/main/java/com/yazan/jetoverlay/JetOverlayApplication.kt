@@ -2,11 +2,8 @@ package com.yazan.jetoverlay
 
 import android.app.Application
 import android.content.ComponentCallbacks2
-import androidx.compose.runtime.collectAsState
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.ui.Modifier
+import androidx.compose.runtime.Composer
+import androidx.compose.runtime.ComposeStackTraceMode
 import com.yazan.jetoverlay.api.OverlayNotificationConfig
 import com.yazan.jetoverlay.api.OverlaySdk
 import com.yazan.jetoverlay.data.AppDatabase
@@ -34,12 +31,17 @@ class JetOverlayApplication : Application() {
         private set
     lateinit var networkMonitor: NetworkMonitor
         private set
+    private var messageProcessor: com.yazan.jetoverlay.domain.MessageProcessor? = null
 
     override fun onCreate() {
         super.onCreate()
         try {
             // Install crash handler first thing
             CrashHandler.install()
+
+            if (!BuildConfig.DEBUG) {
+                Composer.setDiagnosticStackTraceMode(ComposeStackTraceMode.GroupKeys)
+            }
 
             Logger.lifecycle("Application", "onCreate started")
             instance = this
@@ -58,6 +60,12 @@ class JetOverlayApplication : Application() {
                 notificationConfig = OverlayNotificationConfig()
             )
             Logger.lifecycle("Application", "SDK initialized")
+
+            // Start the message processor to handle all ingestion sources
+            messageProcessor = com.yazan.jetoverlay.domain.MessageProcessor(
+                repository = repository,
+                context = applicationContext
+            ).also { it.start() }
 
             // Register default agent overlay content (overlay_1)
             OverlaySdk.registerContent("overlay_1") { payload ->
@@ -149,6 +157,8 @@ class JetOverlayApplication : Application() {
 
     override fun onTerminate() {
         super.onTerminate()
+        messageProcessor?.stop()
+        messageProcessor = null
         applicationScope.cancel()
     }
 

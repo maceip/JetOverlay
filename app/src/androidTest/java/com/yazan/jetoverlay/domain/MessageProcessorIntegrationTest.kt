@@ -29,7 +29,7 @@ import kotlin.time.Duration.Companion.seconds
  * 2. MessageProcessor picks it up and processes it
  * 3. Bucket is assigned correctly based on heuristics
  * 4. VeiledContent is generated based on bucket
- * 5. GeneratedResponses are populated from StubLlmService
+ * 5. GeneratedResponses are populated from a deterministic test LLM
  * 6. Status transitions to PROCESSED
  */
 @OptIn(ExperimentalCoroutinesApi::class)
@@ -42,7 +42,7 @@ class MessageProcessorIntegrationTest {
     private lateinit var processor: MessageProcessor
     private lateinit var categorizer: MessageCategorizer
     private lateinit var veilGenerator: VeilGenerator
-    private lateinit var llmService: StubLlmService
+    private lateinit var llmService: FakeLlmService
 
     @Before
     fun setUp() {
@@ -57,7 +57,7 @@ class MessageProcessorIntegrationTest {
         repository = MessageRepository(messageDao)
         categorizer = MessageCategorizer()
         veilGenerator = VeilGenerator()
-        llmService = StubLlmService()
+        llmService = FakeLlmService()
         processor = MessageProcessor(repository, categorizer, veilGenerator, llmService)
     }
 
@@ -624,6 +624,20 @@ class MessageProcessorIntegrationTest {
 
             assertTrue("Message $messageId should be processed within timeout", processed)
             cancelAndConsumeRemainingEvents()
+        }
+    }
+
+    private class FakeLlmService : LlmService {
+        override suspend fun generateResponses(message: Message, bucket: MessageBucket): List<String> {
+            return listOf(
+                "Ack (${bucket.name})",
+                "Processing ${message.id}",
+                "Will follow up"
+            )
+        }
+
+        override suspend fun closeSession(messageId: Long) {
+            // no-op for tests
         }
     }
 }

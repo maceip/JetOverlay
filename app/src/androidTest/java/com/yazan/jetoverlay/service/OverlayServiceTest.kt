@@ -46,9 +46,6 @@ import org.junit.runner.RunWith
  * that will be resolved when Compose BOM stabilizes for API 36.
  */
 @RunWith(AndroidJUnit4::class)
-@Ignore("Temporarily disabled: Compose BOM 2025.12.01 has compatibility issues with API 36 " +
-        "causing NoSuchMethodException for LocalOwnersProvider.getAmbientOwnersProvider(). " +
-        "Re-enable when Compose BOM is updated or issue is resolved.")
 class OverlayServiceTest : BaseAndroidTest() {
 
     companion object {
@@ -480,6 +477,43 @@ class OverlayServiceTest : BaseAndroidTest() {
                 OverlaySdk.isOverlayActive("rapid_test_$iteration")
             )
         }
+    }
+
+    @Test
+    fun overlayService_defersShowUntilContentRegistered() {
+        // Given: A type with no registered content
+        val deferredType = "deferred_overlay_type"
+        val deferredId = "deferred_overlay_id"
+        OverlaySdk.unregisterContent(deferredType)
+
+        // When: show() is called before content registration
+        OverlaySdk.show(
+            context,
+            OverlayConfig(id = deferredId, type = deferredType)
+        )
+
+        // Then: Overlay should remain inactive until content is registered
+        val stayedInactive = TestUtils.waitForOverlayInactive(
+            deferredId,
+            TestConstants.SHORT_TIMEOUT_MS
+        )
+        assertTrue("Overlay should stay inactive before registration", stayedInactive)
+
+        // When: Content is registered for the type
+        OverlaySdk.registerContent(deferredType) {
+            Box(modifier = Modifier.size(10.dp)) { }
+        }
+
+        // Then: Pending show should flush and overlay becomes active
+        val becameActive = TestUtils.waitForOverlayActive(
+            deferredId,
+            TestConstants.EXTENDED_TIMEOUT_MS
+        )
+        assertTrue("Overlay should activate after registration", becameActive)
+
+        // Cleanup
+        OverlaySdk.hide(deferredId)
+        TestUtils.waitForOverlayInactive(deferredId, TestConstants.SHORT_TIMEOUT_MS)
     }
 
     // ==================== Helper Methods ====================

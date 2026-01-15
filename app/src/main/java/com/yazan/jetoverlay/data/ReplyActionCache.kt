@@ -11,22 +11,32 @@ import java.util.concurrent.ConcurrentHashMap
  * Stores both Reply actions (with RemoteInput) and Mark-as-Read actions.
  */
 object ReplyActionCache {
-    private val replyActions = ConcurrentHashMap<Long, Notification.Action>()
-    private val markAsReadActions = ConcurrentHashMap<Long, Notification.Action>()
+    private const val MAX_CACHE_SIZE = 200
+    private const val MAX_AGE_MS = 60 * 60 * 1000L
+
+    private data class CachedAction(
+        val action: Notification.Action,
+        val savedAt: Long = System.currentTimeMillis()
+    )
+
+    private val replyActions = ConcurrentHashMap<Long, CachedAction>()
+    private val markAsReadActions = ConcurrentHashMap<Long, CachedAction>()
     private val notificationKeys = ConcurrentHashMap<Long, String>()
 
     /**
      * Saves a reply action for a message.
      */
     fun save(messageId: Long, action: Notification.Action) {
-        replyActions[messageId] = action
+        replyActions[messageId] = CachedAction(action)
+        pruneIfNeeded()
     }
 
     /**
      * Saves a mark-as-read action for a message.
      */
     fun saveMarkAsRead(messageId: Long, action: Notification.Action) {
-        markAsReadActions[messageId] = action
+        markAsReadActions[messageId] = CachedAction(action)
+        pruneIfNeeded()
     }
 
     /**
@@ -40,14 +50,22 @@ object ReplyActionCache {
      * Gets the reply action for a message.
      */
     fun get(messageId: Long): Notification.Action? {
-        return replyActions[messageId]
+        return replyActions[messageId]?.takeIf { !isExpired(it) }?.action
+            ?: run {
+                replyActions.remove(messageId)
+                null
+            }
     }
 
     /**
      * Gets the mark-as-read action for a message.
      */
     fun getMarkAsRead(messageId: Long): Notification.Action? {
-        return markAsReadActions[messageId]
+        return markAsReadActions[messageId]?.takeIf { !isExpired(it) }?.action
+            ?: run {
+                markAsReadActions.remove(messageId)
+                null
+            }
     }
 
     /**
@@ -61,7 +79,7 @@ object ReplyActionCache {
      * Checks if a reply action exists for a message.
      */
     fun hasReplyAction(messageId: Long): Boolean {
-        return replyActions.containsKey(messageId)
+        return get(messageId) != null
     }
 
     /**
@@ -91,4 +109,28 @@ object ReplyActionCache {
      * Gets all message IDs with cached reply actions.
      */
     fun getAllMessageIds(): Set<Long> = replyActions.keys.toSet()
+
+    private fun isExpired(action: CachedAction): Boolean {
+        return System.currentTimeMillis() - action.savedAt > MAX_AGE_MS
+    }
+
+    private fun pruneIfNeeded() {
+        val now = System.currentTimeMillis()
+        replyActions.entries.removeIf { now - it.value.savedAt > MAX_AGE_MS }
+        markAsReadActions.entries.removeIf { now - it.value.savedAt > MAX_AGE_MS }
+
+        val totalSize = replyActions.size + markAsReadActions.size
+        if (totalSize <= MAX_CACHE_SIZE) return
+
+        val toRemove = (replyActions.entries + markAsReadActions.entries)
+            .sortedBy { it.value.savedAt }
+            .take(totalSize - MAX_CACHE_SIZE)
+            .map { it.key }
+
+        toRemove.forEach { id ->
+            replyActions.remove(id)
+            markAsReadActions.remove(id)
+            notificationKeys.remove(id)
+        }
+    }
 }

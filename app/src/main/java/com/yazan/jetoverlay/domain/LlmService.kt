@@ -14,5 +14,5 @@ interface LlmService {
     /**
      * Closes the session associated with the specific message ID.
      */
-    suspend fun closeSession(messageId: Long)
+    suspend fun closeSession(message: Message)
 }

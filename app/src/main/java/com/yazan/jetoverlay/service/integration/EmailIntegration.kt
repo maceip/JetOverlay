@@ -5,7 +5,9 @@ import android.content.Intent
 import android.net.Uri
 import android.util.Log
 import androidx.browser.customtabs.CustomTabsIntent
+import android.widget.Toast
 import com.yazan.jetoverlay.JetOverlayApplication
+import com.yazan.jetoverlay.app.BuildConfig
 import com.yazan.jetoverlay.data.EmailConfig
 import com.yazan.jetoverlay.data.Message
 import com.yazan.jetoverlay.data.MessageRepository
@@ -24,9 +26,9 @@ import kotlinx.coroutines.withContext
 object EmailIntegration {
 
     private const val TAG = "EmailIntegration"
-    private const val CLIENT_ID = "YOUR_GMAIL_CLIENT_ID" // TODO: Replace with actual credentials
-    private const val CLIENT_SECRET = "YOUR_GMAIL_CLIENT_SECRET" // TODO: Replace
-    private const val REDIRECT_URI = "jetoverlay://email-callback"
+    private val CLIENT_ID = BuildConfig.GMAIL_CLIENT_ID
+    private val CLIENT_SECRET = BuildConfig.GMAIL_CLIENT_SECRET
+    private val REDIRECT_URI = BuildConfig.GMAIL_REDIRECT_URI.ifBlank { "jetoverlay://email-callback" }
     const val EMAIL_PACKAGE_NAME = "email"
 
     // OAuth scopes for Gmail read access
@@ -41,6 +43,15 @@ object EmailIntegration {
      * Opens a browser/custom tab with Google's authorization page.
      */
     fun startOAuth(context: Context) {
+        if (CLIENT_ID.isBlank() || CLIENT_SECRET.isBlank()) {
+            Log.e(TAG, "Gmail OAuth not configured: set GMAIL_CLIENT_ID/SECRET in gradle properties or env.")
+            Toast.makeText(
+                context,
+                "Gmail OAuth not configured. Set GMAIL_CLIENT_ID/SECRET.",
+                Toast.LENGTH_LONG
+            ).show()
+            return
+        }
         Log.d(TAG, "Email integration not yet implemented - OAuth flow is stubbed")
 
         val authUrl = "https://accounts.google.com/o/oauth2/v2/auth" +
@@ -167,7 +178,8 @@ object EmailIntegration {
                     repository.ingestNotification(
                         packageName = EMAIL_PACKAGE_NAME,
                         sender = email.from,
-                        content = content
+                        content = content,
+                        threadKey = "$EMAIL_PACKAGE_NAME:${email.from.lowercase()}"
                     )
                     Log.d(TAG, "Ingested mock email from ${email.from}")
                 }

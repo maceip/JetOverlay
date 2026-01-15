@@ -100,9 +100,14 @@ fun UnifiedInboxDashboard(
 ) {
     val messages by messagesFlow.collectAsState(initial = emptyList())
 
-    // Filter only pending messages (not SENT or DISMISSED)
+    // Filter only pending messages (not SENT or DISMISSED and not snoozed)
     val pendingMessages = remember(messages) {
-        messages.filter { it.status != "SENT" && it.status != "DISMISSED" }
+        val now = System.currentTimeMillis()
+        messages.filter {
+            it.status != "SENT" &&
+                it.status != "DISMISSED" &&
+                (it.snoozedUntil == 0L || it.snoozedUntil <= now)
+        }
     }
 
     // Group messages by context

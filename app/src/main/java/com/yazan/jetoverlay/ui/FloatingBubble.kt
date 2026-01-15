@@ -1,6 +1,7 @@
 package com.yazan.jetoverlay.ui
 
 import android.util.Log
+import com.yazan.jetoverlay.util.Logger
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.ExperimentalAnimationApi
@@ -25,7 +26,7 @@ import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.gestures.detectHorizontalDragGestures
+import androidx.compose.foundation.gestures.detectHorizontalDragGestures        
 import androidx.compose.foundation.gestures.detectVerticalDragGestures
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.*
@@ -41,9 +42,10 @@ import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.automirrored.filled.Send
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.KeyboardArrowDown
-import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.KeyboardArrowUp
+import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material3.*
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -59,12 +61,18 @@ import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
+import androidx.compose.ui.platform.LocalView
+import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import android.view.HapticFeedbackConstants
+import com.skydoves.flexible.bottomsheet.material3.FlexibleBottomSheet
+import com.skydoves.flexible.core.FlexibleSheetSize
+import com.skydoves.flexible.core.rememberFlexibleBottomSheetState
 import com.yazan.jetoverlay.data.Message
 import com.yazan.jetoverlay.domain.MessageBucket
 import kotlinx.coroutines.CancellationException
@@ -73,6 +81,9 @@ import kotlin.math.abs
 import kotlin.math.roundToInt
 
 private const val TAG = "FloatingBubble"
+private const val FAST_ANIM_1 = 80
+private const val FAST_ANIM_2 = 120
+private const val FAST_ANIM_3 = 160
 
 @Composable
 fun FloatingBubble(
@@ -80,10 +91,18 @@ fun FloatingBubble(
     uiState: OverlayUiState
 ) {
     val context = LocalContext.current
-    var showDetail by remember { mutableStateOf(false) }
+    val view = LocalView.current
+
+    LaunchedEffect(uiState.countdownSeconds) {
+        if (uiState.countdownSeconds in 1..5) {
+            view.performHapticFeedback(HapticFeedbackConstants.CLOCK_TICK)      
+        }
+    }
 
     LaunchedEffect(uiState.message.id) {
-        showDetail = false
+        if (uiState.message.id == 0L) {
+            uiState.isExpanded = false
+        }
     }
 
     // Always-on collapsed "tic tac" overlay that only responds to double taps
@@ -93,10 +112,15 @@ fun FloatingBubble(
             onDoubleTap = {
                 uiState.markInteracted()
                 uiState.clearGlow()
-                if (uiState.message.status !in listOf("IDLE", "SENT", "DISMISSED")) {
-                    showDetail = true
+                val hasActiveWork = uiState.isProcessing ||
+                        uiState.shouldGlow ||
+                        uiState.message.status !in listOf("IDLE", "SENT", "DISMISSED")
+                if (hasActiveWork) {
+                    Logger.d("FloatingBubble", "Double-tap while active -> expanding inline sheet")
+                    uiState.isExpanded = true
                 } else {
-                    // Launch settings/control panel when idle
+                    // Launch full-screen settings/control panel when idle
+                    Logger.d("FloatingBubble", "Double-tap while idle -> opening MainActivity")
                     val intent = android.content.Intent(
                         context,
                         com.yazan.jetoverlay.MainActivity::class.java
@@ -107,12 +131,13 @@ fun FloatingBubble(
         )
 
         InlineDetailSheet(
-            visible = showDetail,
+            visible = uiState.isExpanded,
             uiState = uiState,
             onDismiss = {
                 uiState.markInteracted()
                 uiState.clearGlow()
-                showDetail = false
+                uiState.dismissMessage()
+                uiState.isExpanded = false
             },
             modifier = Modifier.align(Alignment.BottomCenter)
         )
@@ -128,13 +153,15 @@ private fun CollapsedStatusOverlay(
         initialValue = -1f,
         targetValue = 1f,
         animationSpec = infiniteRepeatable(
-            animation = tween(durationMillis = if (showKnightRider) 800 else 1600, easing = LinearEasing),
+            animation = tween(durationMillis = if (showKnightRider) 500 else 900, easing = LinearEasing),
             repeatMode = RepeatMode.Reverse
         ),
         label = "stripeOffset"
     )
     val baseColor = Color(0xFF0D0D0D)
-    val activeColor = Color(0xFF8A2BE2)
+    val activeColor = Color(0xFFD40000) // bright red
+    val isLight = !isSystemInDarkTheme()
+    val strokeColor = if (isLight) Color(0xFF3B185F) else Color.White
 
     Box(
         modifier = Modifier
@@ -142,6 +169,7 @@ private fun CollapsedStatusOverlay(
             .height(18.dp)
             .clip(RoundedCornerShape(9.dp))
             .background(baseColor)
+            .border(1.dp, strokeColor, RoundedCornerShape(9.dp))
             .graphicsLayer { alpha = if (showKnightRider) 0.95f else 0.8f }
             .pointerInput(Unit) {
                 detectTapGestures(
@@ -152,11 +180,11 @@ private fun CollapsedStatusOverlay(
         contentAlignment = Alignment.Center
     ) {
         if (showKnightRider) {
-            val gradient = Brush.linearGradient(
-                colors = listOf(baseColor, activeColor, baseColor),
-                start = androidx.compose.ui.geometry.Offset.Zero,
-                end = androidx.compose.ui.geometry.Offset(x = stripeOffset * 200f, y = 0f)
-            )
+                val gradient = Brush.linearGradient(
+                    colors = listOf(baseColor, activeColor.copy(alpha = 0.9f), baseColor),
+                    start = androidx.compose.ui.geometry.Offset.Zero,
+                    end = androidx.compose.ui.geometry.Offset(x = stripeOffset * 400f, y = 0f)
+                )
             Box(
                 modifier = Modifier
                     .matchParentSize()
@@ -167,6 +195,7 @@ private fun CollapsedStatusOverlay(
 }
 
 @Composable
+@OptIn(ExperimentalMaterial3Api::class)
 private fun InlineDetailSheet(
     visible: Boolean,
     uiState: OverlayUiState,
@@ -175,27 +204,37 @@ private fun InlineDetailSheet(
 ) {
     val focusRequester = remember { FocusRequester() }
     val keyboardController = LocalSoftwareKeyboardController.current
+    val sheetState = rememberFlexibleBottomSheetState(
+        isModal = false,
+        skipSlightlyExpanded = true,
+        skipIntermediatelyExpanded = true,
+        flexibleSheetSize = FlexibleSheetSize(
+            fullyExpanded = 0.9f,
+            intermediatelyExpanded = 0.6f,
+            slightlyExpanded = 0.3f
+        )
+    )
 
     LaunchedEffect(uiState.isEditing) {
         if (uiState.isEditing) {
+            kotlinx.coroutines.delay(100)
             focusRequester.requestFocus()
+            keyboardController?.show()
         }
     }
 
-    AnimatedVisibility(
-        visible = visible,
-        enter = slideInVertically { it } + fadeIn(),
-        exit = slideOutVertically { it } + fadeOut(),
-        modifier = modifier
-    ) {
-        Surface(
-            modifier = Modifier
-                .padding(bottom = 8.dp)
-                .widthIn(max = 420.dp)
-                .shadow(12.dp, RoundedCornerShape(topStart = 24.dp, topEnd = 24.dp)),
-            shape = RoundedCornerShape(topStart = 24.dp, topEnd = 24.dp),
-            tonalElevation = 8.dp,
-            color = MaterialTheme.colorScheme.surface
+    if (visible) {
+        LaunchedEffect(visible) { uiState.isExpanded = true }
+        FlexibleBottomSheet(
+            onDismissRequest = {
+                uiState.isExpanded = false
+                onDismiss()
+            },
+            sheetState = sheetState,
+            containerColor = MaterialTheme.colorScheme.surface,
+            scrimColor = Color.Transparent,
+            dragHandle = null,
+            modifier = modifier
         ) {
             Column(
                 modifier = Modifier
@@ -203,6 +242,9 @@ private fun InlineDetailSheet(
                     .padding(16.dp),
                 verticalArrangement = Arrangement.spacedBy(12.dp)
             ) {
+                if (uiState.isSafeMode) {
+                    SafeModeBanner(uiState.safeModeMessage)
+                }
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.spacedBy(12.dp)
@@ -211,7 +253,7 @@ private fun InlineDetailSheet(
                     Column {
                         Text("Incoming message", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
                         Text(
-                            uiState.message.packageName.ifBlank { "System" },
+                            uiState.message.senderName.ifBlank { uiState.message.packageName.ifBlank { "System" } },
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
@@ -283,6 +325,14 @@ private fun InlineDetailSheet(
                     )
                 }
 
+                if (uiState.countdownSeconds > 0) {
+                    Text(
+                        text = "Auto-send in ${uiState.countdownSeconds}s",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.primary
+                    )
+                }
+
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.spacedBy(8.dp)
@@ -292,11 +342,19 @@ private fun InlineDetailSheet(
                         modifier = Modifier.weight(1f)
                     ) { Text("Edit") }
                     OutlinedButton(
-                        onClick = {
-                            uiState.regenerateResponses()
-                        },
+                        onClick = { uiState.regenerateResponses() },
+                        enabled = !uiState.isRegenerating,
                         modifier = Modifier.weight(1f)
-                    ) { Text("Regenerate") }
+                    ) {
+                        if (uiState.isRegenerating) {
+                            CircularProgressIndicator(
+                                modifier = Modifier.size(16.dp),
+                                strokeWidth = 2.dp
+                            )
+                        } else {
+                            Text("Regenerate")
+                        }
+                    }
                     Button(
                         onClick = {
                             if (uiState.isEditing) {
@@ -310,6 +368,28 @@ private fun InlineDetailSheet(
                     ) { Text("Send") }
                 }
             }
+        }
+    }
+}
+
+@Composable
+private fun SafeModeBanner(message: String?) {
+    Card(
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.errorContainer),
+        modifier = Modifier.fillMaxWidth()
+    ) {
+        Column(modifier = Modifier.padding(12.dp)) {
+            Text(
+                text = "Safe mode",
+                style = MaterialTheme.typography.titleSmall,
+                fontWeight = FontWeight.SemiBold,
+                color = MaterialTheme.colorScheme.onErrorContainer
+            )
+            Text(
+                text = message ?: "The overlay hit a recoverable error. Actions are limited.",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onErrorContainer
+            )
         }
     }
 }
@@ -536,8 +616,8 @@ fun ExpandedMessageView(
             AnimatedContent(
                 targetState = uiState.message.id,
                 transitionSpec = {
-                    fadeIn(animationSpec = tween(200)) + slideInVertically { it / 4 } togetherWith
-                    fadeOut(animationSpec = tween(200)) + slideOutVertically { -it / 4 }
+                    fadeIn(animationSpec = tween(FAST_ANIM_3)) + slideInVertically { it / 6 } togetherWith
+                    fadeOut(animationSpec = tween(FAST_ANIM_3)) + slideOutVertically { -it / 6 }
                 },
                 label = "MessageContent"
             ) { _ ->
@@ -577,8 +657,8 @@ fun ExpandedMessageView(
                 AnimatedContent(
                     targetState = uiState.isEditing,
                     transitionSpec = {
-                        fadeIn(animationSpec = tween(150)) togetherWith
-                        fadeOut(animationSpec = tween(150))
+                        fadeIn(animationSpec = tween(FAST_ANIM_2)) togetherWith
+                        fadeOut(animationSpec = tween(FAST_ANIM_2))
                     },
                     label = "ResponseEditorToggle"
                 ) { isEditing ->
@@ -607,7 +687,8 @@ fun ExpandedMessageView(
                                 hasSelectedResponse = uiState.hasSelectedResponse,
                                 onEditClick = { uiState.startEditing() },
                                 onRegenerateClick = { uiState.regenerateResponses() },
-                                onSendClick = { uiState.sendSelectedResponse() }
+                                onSendClick = { uiState.sendSelectedResponse() },
+                                isRegenerating = uiState.isRegenerating
                             )
                         }
                     }
@@ -721,7 +802,7 @@ fun ResponseChip(
     // Animate selection state
     val animatedBorderWidth by animateFloatAsState(
         targetValue = if (isSelected) 2f else 1f,
-        animationSpec = tween(150),
+        animationSpec = tween(FAST_ANIM_1),
         label = "chipBorder"
     )
 
@@ -765,7 +846,8 @@ fun ActionButtonsRow(
     hasSelectedResponse: Boolean,
     onEditClick: () -> Unit,
     onRegenerateClick: () -> Unit,
-    onSendClick: () -> Unit
+    onSendClick: () -> Unit,
+    isRegenerating: Boolean = false
 ) {
     Row(
         modifier = Modifier.fillMaxWidth(),
@@ -792,13 +874,22 @@ fun ActionButtonsRow(
             modifier = Modifier.weight(1f),
             contentPadding = PaddingValues(horizontal = 8.dp, vertical = 6.dp)
         ) {
-            Icon(
-                imageVector = Icons.Default.Refresh,
-                contentDescription = null,
-                modifier = Modifier.size(16.dp)
-            )
-            Spacer(modifier = Modifier.width(4.dp))
-            Text("Regenerate", style = MaterialTheme.typography.labelSmall)
+            if (isRegenerating) {
+                CircularProgressIndicator(
+                    strokeWidth = 2.dp,
+                    modifier = Modifier.size(16.dp)
+                )
+                Spacer(modifier = Modifier.width(4.dp))
+                Text("Regenerating…", style = MaterialTheme.typography.labelSmall)
+            } else {
+                Icon(
+                    imageVector = Icons.Default.Refresh,
+                    contentDescription = null,
+                    modifier = Modifier.size(16.dp)
+                )
+                Spacer(modifier = Modifier.width(4.dp))
+                Text("Regenerate", style = MaterialTheme.typography.labelSmall)
+            }
         }
 
         // Send button (enabled only when response is selected)

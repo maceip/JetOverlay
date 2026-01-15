@@ -47,8 +47,6 @@ Kotlin Source Files
 
 /app/src/main/java/com/yazan/jetoverlay/domain/LiteRTLlmService.kt
 
-/app/src/main/java/com/yazan/jetoverlay/domain/StubLlmService.kt
-
 /app/src/main/java/com/yazan/jetoverlay/domain/ModelManager.kt
 
 /app/src/main/java/com/yazan/jetoverlay/domain/litert/ToolRegistry.kt

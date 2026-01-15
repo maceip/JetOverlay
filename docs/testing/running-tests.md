@@ -89,6 +89,7 @@ Tests the overlay lifecycle:
 - Overlay show/hide operations
 - Configuration change survival
 - Edge cases (duplicate show, rapid cycles)
+- Deferred show behavior (show before content registration)
 
 **Status:** Temporarily disabled (@Ignore)
 
@@ -178,8 +179,8 @@ adb devices
 | Test Class | Tests | Status |
 |------------|-------|--------|
 | MessageDaoTest | 19 | Passing |
-| OverlayServiceTest | 10 | Skipped (Compose compatibility) |
-| **Total** | **29** | **19 passing, 10 skipped** |
+| OverlayServiceTest | 11 | Skipped (Compose compatibility) |
+| **Total** | **30** | **19 passing, 11 skipped** |
 
 ## Next Steps
 

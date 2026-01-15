@@ -1,0 +1,5 @@
+[scanner]
+scan_recursive = true
+
+[severity]
+minimum = "LOW"

@@ -46,7 +46,6 @@ class NotificationMapper {
     fun map(sbn: StatusBarNotification): Message? {
         val extras = sbn.notification.extras
         val packageName = sbn.packageName
-
         // Use app-specific extraction for known apps
         return when (packageName) {
             PKG_WHATSAPP -> mapWhatsApp(sbn, extras)
@@ -142,7 +141,8 @@ class NotificationMapper {
             senderName = sender,
             originalContent = content,
             status = "RECEIVED",
-            contextTag = "personal"
+            contextTag = "personal",
+            threadKey = buildSenderThreadKey(sbn.packageName, sender)
         )
     }
 
@@ -155,7 +155,8 @@ class NotificationMapper {
             senderName = title,
             originalContent = text,
             status = "RECEIVED",
-            contextTag = "personal"
+            contextTag = "personal",
+            threadKey = buildSenderThreadKey(sbn.packageName, title)
         )
     }
 
@@ -176,7 +177,8 @@ class NotificationMapper {
             senderName = sender,
             originalContent = content,
             status = "RECEIVED",
-            contextTag = "personal"
+            contextTag = "personal",
+            threadKey = buildSenderThreadKey(sbn.packageName, sender)
         )
     }
 
@@ -189,7 +191,8 @@ class NotificationMapper {
             senderName = title,
             originalContent = text,
             status = "RECEIVED",
-            contextTag = "social"
+            contextTag = "social",
+            threadKey = buildSenderThreadKey(sbn.packageName, title)
         )
     }
 
@@ -210,7 +213,8 @@ class NotificationMapper {
             senderName = "$sender ($title)",
             originalContent = content,
             status = "RECEIVED",
-            contextTag = "work"
+            contextTag = "work",
+            threadKey = buildSenderThreadKey(sbn.packageName, sender)
         )
     }
 
@@ -223,7 +227,8 @@ class NotificationMapper {
             senderName = title,
             originalContent = text,
             status = "RECEIVED",
-            contextTag = "work"
+            contextTag = "work",
+            threadKey = buildSenderThreadKey(sbn.packageName, title)
         )
     }
 
@@ -236,7 +241,8 @@ class NotificationMapper {
             senderName = title,
             originalContent = text,
             status = "RECEIVED",
-            contextTag = "social"
+            contextTag = "social",
+            threadKey = buildSenderThreadKey(sbn.packageName, title)
         )
     }
 
@@ -249,7 +255,8 @@ class NotificationMapper {
             senderName = title,
             originalContent = text,
             status = "RECEIVED",
-            contextTag = "social"
+            contextTag = "social",
+            threadKey = buildSenderThreadKey(sbn.packageName, title)
         )
     }
 
@@ -264,7 +271,8 @@ class NotificationMapper {
             senderName = sender,
             originalContent = "Subject: $subject\n$preview",
             status = "RECEIVED",
-            contextTag = "email"
+            contextTag = "email",
+            threadKey = buildSenderThreadKey(sbn.packageName, sender)
         )
     }
 
@@ -278,7 +286,8 @@ class NotificationMapper {
             senderName = sender,
             originalContent = "Subject: $subject\n$preview",
             status = "RECEIVED",
-            contextTag = "email"
+            contextTag = "email",
+            threadKey = buildSenderThreadKey(sbn.packageName, sender)
         )
     }
 
@@ -290,8 +299,14 @@ class NotificationMapper {
             packageName = sbn.packageName,
             senderName = title,
             originalContent = text,
-            status = "RECEIVED"
+            status = "RECEIVED",
+            threadKey = buildSenderThreadKey(sbn.packageName, title)
         )
+    }
+
+    private fun buildSenderThreadKey(packageName: String, sender: String): String? {
+        val normalized = sender.trim().lowercase()
+        return if (normalized.isNotEmpty()) "$packageName:$normalized" else null
     }
 
     // --- Helper methods ---

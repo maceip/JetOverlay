@@ -6,9 +6,9 @@ import com.yazan.jetoverlay.JetOverlayApplication
 import com.yazan.jetoverlay.data.MessageRepository
 import com.yazan.jetoverlay.data.NotificationConfigManager
 import com.yazan.jetoverlay.data.ReplyActionCache
-import com.yazan.jetoverlay.domain.MessageProcessor
 import com.yazan.jetoverlay.service.notification.MessageNotificationFilter
 import com.yazan.jetoverlay.service.notification.NotificationMapper
+import com.yazan.jetoverlay.ui.SettingsManager
 import com.yazan.jetoverlay.util.Logger
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -30,7 +30,6 @@ class AppNotificationListenerService : NotificationListenerService() {
 
     private val scope = CoroutineScope(Dispatchers.IO + SupervisorJob())
     private lateinit var repository: MessageRepository
-    private lateinit var processor: MessageProcessor
     private val filter = MessageNotificationFilter()
     private val mapper = NotificationMapper()
 
@@ -38,10 +37,6 @@ class AppNotificationListenerService : NotificationListenerService() {
         super.onCreate()
         Logger.lifecycle(COMPONENT, "onCreate")
         repository = JetOverlayApplication.instance.repository
-
-        // Start the Intelligence Layer
-        processor = MessageProcessor(repository)
-        processor.start()
 
         // Register receiver for cancellation requests
         val receiver = object : android.content.BroadcastReceiver() {
@@ -83,6 +78,18 @@ class AppNotificationListenerService : NotificationListenerService() {
             return
         }
 
+        if (com.yazan.jetoverlay.service.notification.NotificationSilencer.shouldSilence(packageName, notification.notification.extras)) {
+            if (SettingsManager.isCancelNotificationsEnabled(applicationContext)) {
+                try {
+                    cancelNotification(sbn.key)
+                    Logger.d(COMPONENT, "Silenced notification for $packageName (fast rule)")
+                } catch (e: Exception) {
+                    Logger.e(COMPONENT, "Failed to silence notification", e)
+                }
+            }
+            return
+        }
+
         if (filter.shouldProcess(notification)) {
             Logger.d(COMPONENT, "Filter PASSED for $packageName")
 
@@ -97,7 +104,8 @@ class AppNotificationListenerService : NotificationListenerService() {
                         packageName = message.packageName,
                         sender = message.senderName,
                         content = message.originalContent,
-                        contextTag = message.contextTag
+                        contextTag = message.contextTag,
+                        threadKey = message.threadKey
                     )
                     Logger.processing(COMPONENT, "Ingested message", id)
 
@@ -121,11 +129,16 @@ class AppNotificationListenerService : NotificationListenerService() {
                     ReplyActionCache.saveNotificationKey(id, sbn.key)
 
                     // Cancel (hide) the notification if configured to do so
-                    if (config.shouldCancel) {
+                    if (config.shouldCancel && SettingsManager.isCancelNotificationsEnabled(applicationContext)) {
                         launch(Dispatchers.Main) {
                             try {
                                 cancelNotification(sbn.key)
                                 Logger.d(COMPONENT, "Notification cancelled for $packageName")
+                                val stored = repository.getMessage(id)
+                                if (stored != null) {
+                                    val elapsedMs = System.currentTimeMillis() - stored.timestamp
+                                    Logger.processing(COMPONENT, "Ingest->cancel ${elapsedMs}ms", id)
+                                }
                             } catch (e: Exception) {
                                 Logger.e(COMPONENT, "Failed to cancel notification", e)
                             }
@@ -135,15 +148,16 @@ class AppNotificationListenerService : NotificationListenerService() {
                     // AUTO-TRIGGER: Wake up the overlay
                     launch(Dispatchers.Main) {
                         if (!com.yazan.jetoverlay.api.OverlaySdk.isOverlayActive("agent_bubble")) {
-                            Logger.d(COMPONENT, "Triggering OverlaySdk.show()")
-                            com.yazan.jetoverlay.api.OverlaySdk.show(
+                            Logger.d(COMPONENT, "Triggering overlay request")
+                            com.yazan.jetoverlay.util.OverlayLaunchCoordinator.requestOverlay(
                                 context = applicationContext,
                                 config = com.yazan.jetoverlay.api.OverlayConfig(
                                     id = "agent_bubble",
                                     type = "overlay_1",
                                     initialX = 0,
                                     initialY = 120
-                                )
+                                ),
+                                source = "notification_listener"
                             )
                         } else {
                             Logger.d(COMPONENT, "Overlay already active")
@@ -159,6 +173,5 @@ class AppNotificationListenerService : NotificationListenerService() {
     override fun onDestroy() {
         super.onDestroy()
         Logger.lifecycle(COMPONENT, "onDestroy")
-        ReplyActionCache.clear()
     }
 }

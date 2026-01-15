@@ -32,11 +32,24 @@ class MainActivity : ComponentActivity() {
         val repository = JetOverlayApplication.instance.repository
 
         // Handle Slack OAuth Callback
-        if (intent?.action == android.content.Intent.ACTION_VIEW && 
-            intent.data?.scheme == "jetoverlay" && 
-            intent.data?.host == "slack-callback") {
+        if (intent?.action == android.content.Intent.ACTION_VIEW &&
+            intent.data?.scheme == "jetoverlay" &&
+            intent.data?.host == "slack" &&
+            intent.data?.path == "/oauth") {
             lifecycleScope.launch {
                 com.yazan.jetoverlay.service.integration.SlackIntegration.handleCallback(intent.data!!, repository)
+            }
+        }
+
+        // Handle GitHub OAuth Callback
+        if (intent?.action == android.content.Intent.ACTION_VIEW &&
+            intent.data?.scheme == "jetoverlay" &&
+            intent.data?.host == "github-callback") {
+            val code = intent.data?.getQueryParameter("code")
+            if (!code.isNullOrBlank()) {
+                lifecycleScope.launch {
+                    com.yazan.jetoverlay.service.integration.GitHubIntegration.handleOAuthCallback(code)
+                }
             }
         }
 

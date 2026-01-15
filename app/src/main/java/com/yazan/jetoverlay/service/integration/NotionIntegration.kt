@@ -5,6 +5,8 @@ import android.content.Intent
 import android.net.Uri
 import android.util.Log
 import androidx.browser.customtabs.CustomTabsIntent
+import android.widget.Toast
+import com.yazan.jetoverlay.app.BuildConfig
 import com.yazan.jetoverlay.JetOverlayApplication
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -21,9 +23,9 @@ import kotlinx.coroutines.withContext
 object NotionIntegration {
 
     private const val TAG = "NotionIntegration"
-    private const val CLIENT_ID = "YOUR_NOTION_CLIENT_ID" // TODO: Replace with actual credentials
-    private const val CLIENT_SECRET = "YOUR_NOTION_CLIENT_SECRET" // TODO: Replace
-    private const val REDIRECT_URI = "jetoverlay://notion-callback"
+    private val CLIENT_ID = BuildConfig.NOTION_CLIENT_ID
+    private val CLIENT_SECRET = BuildConfig.NOTION_CLIENT_SECRET
+    private val REDIRECT_URI = BuildConfig.NOTION_REDIRECT_URI.ifBlank { "jetoverlay://notion-callback" }
     const val NOTION_PACKAGE_NAME = "notion"
 
     // OAuth URL for Notion
@@ -41,6 +43,15 @@ object NotionIntegration {
      * Opens a browser/custom tab with Notion's authorization page.
      */
     fun startOAuth(context: Context) {
+        if (CLIENT_ID.isBlank() || CLIENT_SECRET.isBlank()) {
+            Log.e(TAG, "Notion OAuth not configured: set NOTION_CLIENT_ID/SECRET in gradle properties or env.")
+            Toast.makeText(
+                context,
+                "Notion OAuth not configured. Set NOTION_CLIENT_ID/SECRET.",
+                Toast.LENGTH_LONG
+            ).show()
+            return
+        }
         Log.d(TAG, "Notion integration not yet implemented - OAuth flow is stubbed")
 
         val authUrl = "$NOTION_AUTH_URL" +
@@ -160,7 +171,8 @@ object NotionIntegration {
                     repository.ingestNotification(
                         packageName = NOTION_PACKAGE_NAME,
                         sender = notification.author,
-                        content = content
+                        content = content,
+                        threadKey = "$NOTION_PACKAGE_NAME:${notification.author.lowercase()}"
                     )
                     Log.d(TAG, "Ingested mock Notion notification from ${notification.author}")
                 }

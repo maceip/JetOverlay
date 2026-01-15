@@ -1,12 +1,74 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <project version="4">
+  <component name="AndroidLayouts">
+    <shared>
+      <config />
+    </shared>
+  </component>
   <component name="AutoImportSettings">
     <option name="autoReloadType" value="NONE" />
   </component>
   <component name="ChangeListManager">
     <list default="true" id="17b00bdd-9dae-47cc-a8c0-88268ae1dca7" name="Changes" comment="">
-      <change beforePath="$PROJECT_DIR$/.idea/vcs.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/vcs.xml" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/app/src/main/assets/icons/gmail.svg" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/app/src/main/assets/icons/instagram.svg" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/app/src/main/assets/icons/linear.svg" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/app/src/main/assets/icons/messenger.svg" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/app/src/main/assets/icons/outlook.svg" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/app/src/main/assets/icons/signal.svg" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/app/src/main/assets/icons/slack.svg" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/app/src/main/assets/icons/sms.svg" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/app/src/main/assets/icons/teams.svg" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/app/src/main/assets/icons/telegram.svg" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/app/src/main/assets/icons/twitter.svg" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/app/src/main/assets/icons/whatsapp.svg" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/.gitignore" beforeDir="false" afterPath="$PROJECT_DIR$/.gitignore" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/ARCHITECTURE.md" beforeDir="false" afterPath="$PROJECT_DIR$/ARCHITECTURE.md" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/app/build.gradle.kts" beforeDir="false" afterPath="$PROJECT_DIR$/app/build.gradle.kts" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/app/src/androidTest/java/com/yazan/jetoverlay/domain/MessageProcessorIntegrationTest.kt" beforeDir="false" afterPath="$PROJECT_DIR$/app/src/androidTest/java/com/yazan/jetoverlay/domain/MessageProcessorIntegrationTest.kt" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/app/src/androidTest/java/com/yazan/jetoverlay/service/OverlayServiceTest.kt" beforeDir="false" afterPath="$PROJECT_DIR$/app/src/androidTest/java/com/yazan/jetoverlay/service/OverlayServiceTest.kt" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/app/src/androidTest/java/com/yazan/jetoverlay/ui/FloatingBubbleTest.kt" beforeDir="false" afterPath="$PROJECT_DIR$/app/src/androidTest/java/com/yazan/jetoverlay/ui/FloatingBubbleTest.kt" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/app/src/main/AndroidManifest.xml" beforeDir="false" afterPath="$PROJECT_DIR$/app/src/main/AndroidManifest.xml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/app/src/main/java/com/yazan/jetoverlay/JetOverlayApplication.kt" beforeDir="false" afterPath="$PROJECT_DIR$/app/src/main/java/com/yazan/jetoverlay/JetOverlayApplication.kt" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/app/src/main/java/com/yazan/jetoverlay/MainActivity.kt" beforeDir="false" afterPath="$PROJECT_DIR$/app/src/main/java/com/yazan/jetoverlay/MainActivity.kt" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/app/src/main/java/com/yazan/jetoverlay/OverlayControlPanel.kt" beforeDir="false" afterPath="$PROJECT_DIR$/app/src/main/java/com/yazan/jetoverlay/OverlayControlPanel.kt" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/app/src/main/java/com/yazan/jetoverlay/data/AppDatabase.kt" beforeDir="false" afterPath="$PROJECT_DIR$/app/src/main/java/com/yazan/jetoverlay/data/AppDatabase.kt" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/app/src/main/java/com/yazan/jetoverlay/data/Message.kt" beforeDir="false" afterPath="$PROJECT_DIR$/app/src/main/java/com/yazan/jetoverlay/data/Message.kt" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/app/src/main/java/com/yazan/jetoverlay/data/MessageRepository.kt" beforeDir="false" afterPath="$PROJECT_DIR$/app/src/main/java/com/yazan/jetoverlay/data/MessageRepository.kt" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/app/src/main/java/com/yazan/jetoverlay/domain/LiteRTLlmService.kt" beforeDir="false" afterPath="$PROJECT_DIR$/app/src/main/java/com/yazan/jetoverlay/domain/LiteRTLlmService.kt" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/app/src/main/java/com/yazan/jetoverlay/domain/MessageProcessor.kt" beforeDir="false" afterPath="$PROJECT_DIR$/app/src/main/java/com/yazan/jetoverlay/domain/MessageProcessor.kt" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/app/src/main/java/com/yazan/jetoverlay/domain/ResponseSender.kt" beforeDir="false" afterPath="$PROJECT_DIR$/app/src/main/java/com/yazan/jetoverlay/domain/ResponseSender.kt" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/app/src/main/java/com/yazan/jetoverlay/domain/StubLlmService.kt" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/app/src/main/java/com/yazan/jetoverlay/domain/litert/AppToolBridge.kt" beforeDir="false" afterPath="$PROJECT_DIR$/app/src/main/java/com/yazan/jetoverlay/domain/litert/AppToolBridge.kt" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/app/src/main/java/com/yazan/jetoverlay/service/AppNotificationListenerService.kt" beforeDir="false" afterPath="$PROJECT_DIR$/app/src/main/java/com/yazan/jetoverlay/service/AppNotificationListenerService.kt" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/app/src/main/java/com/yazan/jetoverlay/service/callscreening/CallScreeningService.kt" beforeDir="false" afterPath="$PROJECT_DIR$/app/src/main/java/com/yazan/jetoverlay/service/callscreening/CallScreeningService.kt" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/app/src/main/java/com/yazan/jetoverlay/service/integration/EmailIntegration.kt" beforeDir="false" afterPath="$PROJECT_DIR$/app/src/main/java/com/yazan/jetoverlay/service/integration/EmailIntegration.kt" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/app/src/main/java/com/yazan/jetoverlay/service/integration/GitHubIntegration.kt" beforeDir="false" afterPath="$PROJECT_DIR$/app/src/main/java/com/yazan/jetoverlay/service/integration/GitHubIntegration.kt" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/app/src/main/java/com/yazan/jetoverlay/service/integration/NotionIntegration.kt" beforeDir="false" afterPath="$PROJECT_DIR$/app/src/main/java/com/yazan/jetoverlay/service/integration/NotionIntegration.kt" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/app/src/main/java/com/yazan/jetoverlay/service/integration/SlackIntegration.kt" beforeDir="false" afterPath="$PROJECT_DIR$/app/src/main/java/com/yazan/jetoverlay/service/integration/SlackIntegration.kt" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/app/src/main/java/com/yazan/jetoverlay/service/integration/SmsIntegration.kt" beforeDir="false" afterPath="$PROJECT_DIR$/app/src/main/java/com/yazan/jetoverlay/service/integration/SmsIntegration.kt" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/app/src/main/java/com/yazan/jetoverlay/service/notification/NotificationMapper.kt" beforeDir="false" afterPath="$PROJECT_DIR$/app/src/main/java/com/yazan/jetoverlay/service/notification/NotificationMapper.kt" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/app/src/main/java/com/yazan/jetoverlay/ui/AgentOverlay.kt" beforeDir="false" afterPath="$PROJECT_DIR$/app/src/main/java/com/yazan/jetoverlay/ui/AgentOverlay.kt" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/app/src/main/java/com/yazan/jetoverlay/ui/CallScreeningOverlay.kt" beforeDir="false" afterPath="$PROJECT_DIR$/app/src/main/java/com/yazan/jetoverlay/ui/CallScreeningOverlay.kt" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/app/src/main/java/com/yazan/jetoverlay/ui/FloatingBubble.kt" beforeDir="false" afterPath="$PROJECT_DIR$/app/src/main/java/com/yazan/jetoverlay/ui/FloatingBubble.kt" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/app/src/main/java/com/yazan/jetoverlay/ui/OverlayUiState.kt" beforeDir="false" afterPath="$PROJECT_DIR$/app/src/main/java/com/yazan/jetoverlay/ui/OverlayUiState.kt" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/app/src/main/java/com/yazan/jetoverlay/ui/PermissionWizard.kt" beforeDir="false" afterPath="$PROJECT_DIR$/app/src/main/java/com/yazan/jetoverlay/ui/PermissionWizard.kt" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/app/src/main/java/com/yazan/jetoverlay/ui/SettingsScreen.kt" beforeDir="false" afterPath="$PROJECT_DIR$/app/src/main/java/com/yazan/jetoverlay/ui/SettingsScreen.kt" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/app/src/main/java/com/yazan/jetoverlay/ui/UnifiedInboxDashboard.kt" beforeDir="false" afterPath="$PROJECT_DIR$/app/src/main/java/com/yazan/jetoverlay/ui/UnifiedInboxDashboard.kt" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/app/src/main/java/com/yazan/jetoverlay/util/PermissionManager.kt" beforeDir="false" afterPath="$PROJECT_DIR$/app/src/main/java/com/yazan/jetoverlay/util/PermissionManager.kt" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/app/src/test/java/com/yazan/jetoverlay/domain/StubLlmServiceTest.kt" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/docs/slack-auth.md" beforeDir="false" afterPath="$PROJECT_DIR$/docs/slack-auth.md" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/docs/testing/running-tests.md" beforeDir="false" afterPath="$PROJECT_DIR$/docs/testing/running-tests.md" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/gradle.properties" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/gradle/libs.versions.toml" beforeDir="false" afterPath="$PROJECT_DIR$/gradle/libs.versions.toml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/jetoverlay/build.gradle.kts" beforeDir="false" afterPath="$PROJECT_DIR$/jetoverlay/build.gradle.kts" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/jetoverlay/src/main/AndroidManifest.xml" beforeDir="false" afterPath="$PROJECT_DIR$/jetoverlay/src/main/AndroidManifest.xml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/jetoverlay/src/main/java/com/yazan/jetoverlay/api/OverlayConfig.kt" beforeDir="false" afterPath="$PROJECT_DIR$/jetoverlay/src/main/java/com/yazan/jetoverlay/api/OverlayConfig.kt" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/jetoverlay/src/main/java/com/yazan/jetoverlay/api/OverlaySdk.kt" beforeDir="false" afterPath="$PROJECT_DIR$/jetoverlay/src/main/java/com/yazan/jetoverlay/api/OverlaySdk.kt" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/jetoverlay/src/main/java/com/yazan/jetoverlay/service/OverlayService.kt" beforeDir="false" afterPath="$PROJECT_DIR$/jetoverlay/src/main/java/com/yazan/jetoverlay/service/OverlayService.kt" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/map.txt" beforeDir="false" afterPath="$PROJECT_DIR$/map.txt" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/settings.gradle.kts" beforeDir="false" afterPath="$PROJECT_DIR$/settings.gradle.kts" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -16,7 +78,10 @@
   <component name="ClangdSettings">
     <option name="formatViaClangd" value="false" />
   </component>
-  <component name="ExecutionTargetManager" SELECTED_TARGET="device_and_snapshot_combo_box_target[PhysicalDevice::serial=4C101FDKD000PZ]" />
+  <component name="EmbeddingIndexingInfo">
+    <option name="cachedIndexableFilesCount" value="214" />
+  </component>
+  <component name="ExecutionTargetManager" SELECTED_TARGET="device_and_snapshot_combo_box_target[DeviceId(pluginId=PhysicalDevice, isTemplate=false, identifier=serial=4C101FDKD000PZ)]" />
   <component name="ExternalProjectsData">
     <projectState path="$PROJECT_DIR$">
       <ProjectState />
@@ -25,6 +90,9 @@
   <component name="ExternalProjectsManager">
     <system id="GRADLE">
       <state>
+        <task path="$PROJECT_DIR$">
+          <activation />
+        </task>
         <projects_view>
           <tree_state>
             <expand>
@@ -48,13 +116,17 @@
     &quot;assignee&quot;: &quot;maceip&quot;
   }
 }</component>
-  <component name="GithubPullRequestsUISettings"><![CDATA[{
-  "selectedUrlAndAccountId": {
-    "url": "https://github.com/maceip/jetoverlay",
-    "accountId": "92977fcc-7c49-4202-9e31-6f033ed89207"
+  <component name="GithubPullRequestsUISettings">{
+  &quot;selectedUrlAndAccountId&quot;: {
+    &quot;url&quot;: &quot;https://github.com/maceip/jetoverlay&quot;,
+    &quot;accountId&quot;: &quot;92977fcc-7c49-4202-9e31-6f033ed89207&quot;
   }
-}]]></component>
+}</component>
   <component name="GradleScriptDefinitionsStorage" workingDir="$PROJECT_DIR$" gradleHome="C:\Users\mac\.gradle\wrapper\dists\gradle-8.13-bin\5xuhj0ry160q40clulazy9h7d\gradle-8.13" javaHome="C:\Program Files\Android\Android Studio\jbr" gradleVersion="8.13" />
+  <component name="McpProjectServerCommands">
+    <commands />
+    <urls />
+  </component>
   <component name="ProjectColorInfo">{
   &quot;associatedIndex&quot;: 5
 }</component>
@@ -63,21 +135,37 @@
     <option name="hideEmptyMiddlePackages" value="true" />
     <option name="showLibraryContents" value="true" />
   </component>
-  <component name="PropertiesComponent"><![CDATA[{
-  "keyToString": {
-    "Android App.app.executor": "Run",
-    "ModuleVcsDetector.initialDetectionPerformed": "true",
-    "RunOnceActivity.ShowReadmeOnStart": "true",
-    "RunOnceActivity.cidr.known.project.marker": "true",
-    "RunOnceActivity.git.unshallow": "true",
-    "RunOnceActivity.readMode.enableVisualFormatting": "true",
-    "cf.first.check.clang-format": "false",
-    "cidr.known.project.marker": "true",
-    "git-widget-placeholder": "master",
-    "kotlin-language-version-configured": "true"
+  <component name="PropertiesComponent">{
+  &quot;keyToString&quot;: {
+    &quot;Android App.app.executor&quot;: &quot;Run&quot;,
+    &quot;Gradle.jetoverlay [:jetoverlay:testDebugUnitTest].executor&quot;: &quot;Run&quot;,
+    &quot;ModuleVcsDetector.initialDetectionPerformed&quot;: &quot;true&quot;,
+    &quot;RunOnceActivity.MCP Project settings loaded&quot;: &quot;true&quot;,
+    &quot;RunOnceActivity.ShowReadmeOnStart&quot;: &quot;true&quot;,
+    &quot;RunOnceActivity.TerminalTabsStorage.copyFrom.TerminalArrangementManager.252&quot;: &quot;true&quot;,
+    &quot;RunOnceActivity.cidr.known.project.marker&quot;: &quot;true&quot;,
+    &quot;RunOnceActivity.git.unshallow&quot;: &quot;true&quot;,
+    &quot;RunOnceActivity.readMode.enableVisualFormatting&quot;: &quot;true&quot;,
+    &quot;RunOnceActivity.typescript.service.memoryLimit.init&quot;: &quot;true&quot;,
+    &quot;cf.first.check.clang-format&quot;: &quot;false&quot;,
+    &quot;cidr.known.project.marker&quot;: &quot;true&quot;,
+    &quot;com.intellij.ml.llm.matterhorn.ej.ui.settings.DefaultModelSelectionForGA.v1&quot;: &quot;true&quot;,
+    &quot;git-widget-placeholder&quot;: &quot;master&quot;,
+    &quot;ignore.virus.scanning.warn.message&quot;: &quot;true&quot;,
+    &quot;junie.onboarding.icon.badge.shown&quot;: &quot;true&quot;,
+    &quot;kotlin-language-version-configured&quot;: &quot;true&quot;,
+    &quot;last_opened_file_path&quot;: &quot;C:/Users/mac/AndroidStudioProjects/ext/jetoverlay&quot;,
+    &quot;node.js.detected.package.eslint&quot;: &quot;true&quot;,
+    &quot;node.js.detected.package.tslint&quot;: &quot;true&quot;,
+    &quot;node.js.selected.package.eslint&quot;: &quot;(autodetect)&quot;,
+    &quot;node.js.selected.package.tslint&quot;: &quot;(autodetect)&quot;,
+    &quot;nodejs_package_manager_path&quot;: &quot;npm&quot;,
+    &quot;settings.editor.selected.configurable&quot;: &quot;preferences.pluginManager&quot;,
+    &quot;to.speed.mode.migration.done&quot;: &quot;true&quot;,
+    &quot;vue.rearranger.settings.migration&quot;: &quot;true&quot;
   }
-}]]></component>
-  <component name="RunManager">
+}</component>
+  <component name="RunManager" selected="Gradle.jetoverlay [:jetoverlay:testDebugUnitTest]">
     <configuration name="app" type="AndroidRunConfigurationType" factoryName="Android App" activateToolWindowBeforeRun="false">
       <module name="jetoverlay.app" />
       <option name="ANDROID_RUN_CONFIGURATION_SCHEMA_VERSION" value="1" />
@@ -99,40 +187,11 @@
       <option name="CLEAR_LOGCAT" value="false" />
       <option name="SHOW_LOGCAT_AUTOMATICALLY" value="false" />
       <option name="TARGET_SELECTION_MODE" value="DEVICE_AND_SNAPSHOT_COMBO_BOX" />
-      <option name="SELECTED_CLOUD_MATRIX_CONFIGURATION_ID" value="-1" />
-      <option name="SELECTED_CLOUD_MATRIX_PROJECT_ID" value="" />
-      <option name="DEBUGGER_TYPE" value="Auto" />
-      <Auto>
-        <option name="USE_JAVA_AWARE_DEBUGGER" value="false" />
-        <option name="SHOW_STATIC_VARS" value="true" />
-        <option name="WORKING_DIR" value="" />
-        <option name="TARGET_LOGGING_CHANNELS" value="lldb process:gdb-remote packets" />
-        <option name="SHOW_OPTIMIZED_WARNING" value="true" />
-        <option name="ATTACH_ON_WAIT_FOR_DEBUGGER" value="false" />
-        <option name="DEBUG_SANDBOX_SDK" value="false" />
-      </Auto>
-      <Hybrid>
-        <option name="USE_JAVA_AWARE_DEBUGGER" value="false" />
-        <option name="SHOW_STATIC_VARS" value="true" />
-        <option name="WORKING_DIR" value="" />
-        <option name="TARGET_LOGGING_CHANNELS" value="lldb process:gdb-remote packets" />
-        <option name="SHOW_OPTIMIZED_WARNING" value="true" />
-        <option name="ATTACH_ON_WAIT_FOR_DEBUGGER" value="false" />
-        <option name="DEBUG_SANDBOX_SDK" value="false" />
-      </Hybrid>
+      <option name="DEBUGGER_TYPE" value="Java" />
       <Java>
         <option name="ATTACH_ON_WAIT_FOR_DEBUGGER" value="false" />
         <option name="DEBUG_SANDBOX_SDK" value="false" />
       </Java>
-      <Native>
-        <option name="USE_JAVA_AWARE_DEBUGGER" value="false" />
-        <option name="SHOW_STATIC_VARS" value="true" />
-        <option name="WORKING_DIR" value="" />
-        <option name="TARGET_LOGGING_CHANNELS" value="lldb process:gdb-remote packets" />
-        <option name="SHOW_OPTIMIZED_WARNING" value="true" />
-        <option name="ATTACH_ON_WAIT_FOR_DEBUGGER" value="false" />
-        <option name="DEBUG_SANDBOX_SDK" value="false" />
-      </Native>
       <Profilers>
         <option name="ADVANCED_PROFILING_ENABLED" value="false" />
         <option name="STARTUP_PROFILING_ENABLED" value="false" />
@@ -150,6 +209,48 @@
         <option name="Android.Gradle.BeforeRunTask" enabled="true" />
       </method>
     </configuration>
+    <configuration name="jetoverlay [:jetoverlay:testDebugUnitTest]" type="GradleRunConfiguration" factoryName="Gradle" temporary="true">
+      <ExternalSystemSettings>
+        <option name="executionName" />
+        <option name="externalProjectPath" value="$PROJECT_DIR$" />
+        <option name="externalSystemIdString" value="GRADLE" />
+        <option name="scriptParameters" />
+        <option name="taskDescriptions">
+          <list />
+        </option>
+        <option name="taskNames">
+          <list>
+            <option value=":jetoverlay:testDebugUnitTest" />
+          </list>
+        </option>
+        <option name="vmOptions" />
+      </ExternalSystemSettings>
+      <ExternalSystemDebugServerProcess>true</ExternalSystemDebugServerProcess>
+      <ExternalSystemReattachDebugProcess>true</ExternalSystemReattachDebugProcess>
+      <ExternalSystemDebugDisabled>false</ExternalSystemDebugDisabled>
+      <EXTENSION ID="com.android.tools.idea.testartifacts.testsuite.GradleRunConfigurationExtension">
+        <com.android.tools.idea.testartifacts.testsuite.SHOW_TEST_RESULT_IN_ANDROID_TEST_SUITE_VIEW>false</com.android.tools.idea.testartifacts.testsuite.SHOW_TEST_RESULT_IN_ANDROID_TEST_SUITE_VIEW>
+        <android.execution.deploysToLocalDevice>false</android.execution.deploysToLocalDevice>
+      </EXTENSION>
+      <DebugAllEnabled>false</DebugAllEnabled>
+      <RunAsTest>false</RunAsTest>
+      <GradleProfilingDisabled>false</GradleProfilingDisabled>
+      <GradleCoverageDisabled>false</GradleCoverageDisabled>
+      <method v="2" />
+    </configuration>
+    <recent_temporary>
+      <list>
+        <item itemvalue="Gradle.jetoverlay [:jetoverlay:testDebugUnitTest]" />
+      </list>
+    </recent_temporary>
+  </component>
+  <component name="SharedIndexes">
+    <attachedChunks>
+      <set>
+        <option value="bundled-jdk-30f59d01ecdd-26cb7f24e5b0-intellij.indexing.shared.core-IU-253.29346.138" />
+        <option value="bundled-js-predefined-d6986cc7102b-9b0f141eb926-JavaScript-IU-253.29346.138" />
+      </set>
+    </attachedChunks>
   </component>
   <component name="TaskManager">
     <task active="true" id="Default" summary="Default task">
@@ -158,7 +259,12 @@
       <option name="number" value="Default" />
       <option name="presentableId" value="Default" />
       <updated>1767286472522</updated>
+      <workItem from="1768442324125" duration="1868000" />
+      <workItem from="1768472622632" duration="7000" />
     </task>
     <servers />
+  </component>
+  <component name="TypeScriptGeneratedFilesManager">
+    <option name="version" value="3" />
   </component>
 </project>

@@ -41,6 +41,7 @@ android {
     kotlin {
         compilerOptions {
             freeCompilerArgs.add("-XXLanguage:+PropertyParamAnnotationDefaultTargetMode")
+            freeCompilerArgs.add("-Xreturn-value-checker=check")
         }
     }
 }
@@ -49,6 +50,7 @@ dependencies {
     implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.appcompat)
     implementation(libs.material)
+    implementation("org.jetbrains.kotlin:kotlin-reflect")
 
     // --- Compose Dependencies ---
     implementation(platform(libs.androidx.compose.bom))
